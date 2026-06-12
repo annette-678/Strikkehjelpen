@@ -1,0 +1,197 @@
+bash
+
+cat >> /home/claude/work/garnlager.jsx << 'EOF'
+
+/* ============================================================
+   PINNER & REDSKAP — needle/hook inventory
+   ============================================================ */
+
+function emptyTool() {
+  return {
+    id: uid(),
+    type: "Rundpinner",
+    storrelse: "4",
+    lengde: "60 cm",
+    merke: "",
+    antall: 1,
+    notater: "",
+  };
+}
+
+function ToolsView({ tools, setTools, showToast }) {
+  const [editing, setEditing] = useState(null);
+  const [showAdd, setShowAdd] = useState(false);
+  const [filterType, setFilterType] = useState(null);
+
+  function handleSave(tool) {
+    setTools((prev) => {
+      const exists = prev.find((t) => t.id === tool.id);
+      if (exists) return prev.map((t) => (t.id === tool.id ? tool : t));
+      return [...prev, tool];
+    });
+    setEditing(null);
+    setShowAdd(false);
+    showToast("Redskap lagret");
+  }
+
+  function handleDelete(id) {
+    setTools((prev) => prev.filter((t) => t.id !== id));
+    showToast("Redskap fjernet");
+  }
+
+  const filtered = tools.filter((t) => !filterType || t.type === filterType);
+
+  // sort by type, then by numeric size
+  const sorted = [...filtered].sort((a, b) => {
+    if (a.type !== b.type) return a.type.localeCompare(b.type);
+    return parseFloat(a.storrelse) - parseFloat(b.storrelse);
+  });
+
+  return (
+    <div>
+      <div className="view-header">
+        <div>
+          <h1 className="view-title">Pinner &amp; redskap</h1>
+          <p className="view-desc">
+            Oversikt over strikkepinner, heklepinner og annet tilbehør du har — størrelser, lengder og antall. Sammenlign med pinneanbefalinger i håndboken når du planlegger et prosjekt.
+          </p>
+        </div>
+        <button className="btn" onClick={() => setShowAdd(true)}>+ Legg til redskap</button>
+      </div>
+
+      <div className="toolbar">
+        <div className="chip-group" role="group" aria-label="Filtrer på type">
+          {NEEDLE_TYPES.map((t) => (
+            <button key={t} className={`chip ${filterType === t ? "active" : ""}`} onClick={() => setFilterType(filterType === t ? null : t)}>
+              {t}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {sorted.length === 0 ? (
+        <div className="empty">
+          <span className="empty-icon">🪡</span>
+          <h3>Ingen redskap registrert</h3>
+          <p>Legg inn strikkepinner, heklepinner, rundpinner og strømpepinnesett med størrelse og lengde, så har du full oversikt neste gang du skal sette i gang med et prosjekt.</p>
+          <button className="btn" onClick={() => setShowAdd(true)}>+ Legg til redskap</button>
+        </div>
+      ) : (
+        <table className="tool-table">
+          <thead>
+            <tr>
+              <th>Type</th>
+              <th>Størrelse</th>
+              <th>Lengde</th>
+              <th>Merke</th>
+              <th>Antall</th>
+              <th>Notater</th>
+              <th aria-label="Handlinger"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map((t) => (
+              <tr key={t.id}>
+                <td>{t.type}</td>
+                <td>{t.storrelse} mm</td>
+                <td>{t.lengde || "—"}</td>
+                <td>{t.merke || "—"}</td>
+                <td>{t.antall}</td>
+                <td style={{ color: "var(--walnut-soft)" }}>{t.notater || "—"}</td>
+                <td style={{ whiteSpace: "nowrap" }}>
+                  <button className="btn btn-outline btn-sm" onClick={() => setEditing(t)}>Rediger</button>{" "}
+                  <button className="btn btn-danger btn-sm" onClick={() => handleDelete(t.id)}>Slett</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+
+      {(showAdd || editing) && (
+        <ToolFormModal
+          initial={editing || emptyTool()}
+          onSave={handleSave}
+          onClose={() => { setShowAdd(false); setEditing(null); }}
+          isNew={!editing}
+        />
+      )}
+    </div>
+  );
+}
+
+function ToolFormModal({ initial, onSave, onClose, isNew }) {
+  const [form, setForm] = useState(initial);
+  const isHook = form.type === "Heklepinne";
+  const sizeOptions = isHook ? STANDARD_SIZES_HOOK : STANDARD_SIZES_NEEDLE;
+
+  function update(field, value) {
+    setForm((f) => ({ ...f, [field]: value }));
+  }
+
+  function handleSubmit(e) {
+    e.preventDefault();
+    onSave(form);
+  }
+
+  return (
+    <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="modal" role="dialog" aria-modal="true" aria-labelledby="tool-modal-title">
+        <div className="modal-header">
+          <h2 id="tool-modal-title">{isNew ? "Legg til redskap" : "Rediger redskap"}</h2>
+          <button className="modal-close" onClick={onClose} aria-label="Lukk">×</button>
+        </div>
+        <form onSubmit={handleSubmit}>
+          <div className="modal-body">
+            <div className="form-row">
+              <div className="form-field">
+                <label htmlFor="type">Type</label>
+                <select id="type" className="select" value={form.type} onChange={(e) => update("type", e.target.value)}>
+                  {NEEDLE_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+              <div className="form-field">
+                <label htmlFor="storrelse">Størrelse (mm)</label>
+                <input id="storrelse" className="input" list="size-options" value={form.storrelse} onChange={(e) => update("storrelse", e.target.value)} placeholder="f.eks. 4" />
+                <datalist id="size-options">
+                  {sizeOptions.map((s) => <option key={s} value={s} />)}
+                </datalist>
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-field">
+                <label htmlFor="lengde">Lengde</label>
+                <input id="lengde" className="input" list="length-options" value={form.lengde} onChange={(e) => update("lengde", e.target.value)} placeholder="f.eks. 60 cm" />
+                <datalist id="length-options">
+                  {NEEDLE_LENGTHS.map((l) => <option key={l} value={l} />)}
+                </datalist>
+              </div>
+              <div className="form-field">
+                <label htmlFor="antall">Antall</label>
+                <input id="antall" className="input" type="number" min="1" value={form.antall} onChange={(e) => update("antall", e.target.value)} />
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-field">
+                <label htmlFor="merke">Merke</label>
+                <input id="merke" className="input" value={form.merke} onChange={(e) => update("merke", e.target.value)} placeholder="f.eks. KnitPro, Addi, Prym" />
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-field">
+                <label htmlFor="tool-notater">Notater</label>
+                <textarea id="tool-notater" className="input" value={form.notater} onChange={(e) => update("notater", e.target.value)} placeholder="f.eks. Lett bøyelig, savnet endestopper" />
+              </div>
+            </div>
+          </div>
+          <div className="modal-footer">
+            <button type="button" className="btn btn-outline" onClick={onClose}>Avbryt</button>
+            <button type="submit" className="btn">Lagre</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+EOF
+echo done
