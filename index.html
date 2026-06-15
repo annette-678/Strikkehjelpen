@@ -11,30 +11,37 @@
 <body>
 <div id="root">
   <div style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;color:#6E5C4B;flex-direction:column;gap:12px;">
-    <span style="font-size:36px">🧶</span>
-    <p style="margin:0">Laster …</p>
+    <span style="font-size:36px">🧶</span><p style="margin:0">Laster …</p>
   </div>
 </div>
 
-<!-- Firebase compat (UMD — fungerer med Babel standalone) -->
+<!-- Google Identity Services -->
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+
+<!-- Firebase (kun Firestore — ingen Auth) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
 <script>
-const firebaseConfig = {
+const GOOGLE_CLIENT_ID = "107531873859-cps3poci5icvhob55jbjgeceb859tebh.apps.googleusercontent.com";
+
+firebase.initializeApp({
   apiKey: "AIzaSyBOVc8Fr93i-aoW6LI2XeuLpvDqRPGFTNE",
   authDomain: "garnlager-cfe4c.firebaseapp.com",
   projectId: "garnlager-cfe4c",
   storageBucket: "garnlager-cfe4c.firebasestorage.app",
   messagingSenderId: "1018266737459",
-  appId: "1:1018266737459:web:618cd7324e1b6bccfe3c46",
-  measurementId: "G-7ZTLTB6TLB"
-};
+  appId: "1:1018266737459:web:618cd7324e1b6bccfe3c46"
+});
+window._db = firebase.firestore();
 
-firebase.initializeApp(firebaseConfig);
-window._auth = firebase.auth();
-window._db   = firebase.firestore();
+// Enkel brukerinfo lagret i localStorage (ikke sensitiv — bare navn, bilde, sub-id)
+window._getStoredUser = () => {
+  try { return JSON.parse(localStorage.getItem("garnlager_user") || "null"); } catch(e) { return null; }
+};
+window._setStoredUser = (u) => {
+  try { localStorage.setItem("garnlager_user", u ? JSON.stringify(u) : "null"); } catch(e) {}
+};
 </script>
 
 <!-- React + Babel -->
@@ -349,21 +356,23 @@ const GARNLAGER_CSS = `
 `;
 
 
-/* ---------- Firebase compat storage helpers ---------- */
+/* ---------- Firestore storage helpers ---------- */
 async function loadData(key, uid, fallback) {
   if (!uid) return fallback;
   try {
-    const snap = await window._db.collection("users").doc(uid).collection("garnlager").doc(key).get();
+    const snap = await window._db.collection("users").doc(uid)
+      .collection("garnlager").doc(key).get();
     if (snap.exists) return snap.data().value ?? fallback;
-  } catch (e) { console.error("Last feilet", key, e); }
+  } catch(e) { console.error("Last feilet", key, e); }
   return fallback;
 }
 async function saveData(key, value, uid) {
   if (!uid) return false;
   try {
-    await window._db.collection("users").doc(uid).collection("garnlager").doc(key).set({ value });
+    await window._db.collection("users").doc(uid)
+      .collection("garnlager").doc(key).set({ value });
     return true;
-  } catch (e) { console.error("Lagring feilet", key, e); return false; }
+  } catch(e) { console.error("Lagring feilet", key, e); return false; }
 }
 
 /* ---------- image helpers ---------- */
@@ -403,6 +412,98 @@ function resizeImage(dataUrl, maxDim = 800, quality = 0.78) {
   });
 }
 
+/* ---------- Google Identity Services innlogging ---------- */
+function LoginScreen({ onLogin }) {
+  const btnRef = useRef(null);
+  const [gsiReady, setGsiReady] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    function initGSI() {
+      if (!window.google || !window.google.accounts) return;
+      window.google.accounts.id.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        callback: (response) => {
+          // Decode JWT-token fra Google
+          try {
+            const payload = JSON.parse(atob(response.credential.split(".")[1]));
+            const user = {
+              uid: payload.sub,
+              name: payload.name,
+              email: payload.email,
+              photoURL: payload.picture,
+            };
+            window._setStoredUser(user);
+            onLogin(user);
+          } catch(e) {
+            setError("Innlogging feilet. Prøv igjen.");
+          }
+        },
+        ux_mode: "popup",
+        auto_select: false,
+      });
+      setGsiReady(true);
+    }
+
+    // GSI-scriptet kan allerede være lastet
+    if (window.google && window.google.accounts) {
+      initGSI();
+    } else {
+      // Vent til det lastes
+      const interval = setInterval(() => {
+        if (window.google && window.google.accounts) {
+          clearInterval(interval);
+          initGSI();
+        }
+      }, 100);
+      return () => clearInterval(interval);
+    }
+  }, []);
+
+  function handleSignIn() {
+    if (!gsiReady) return;
+    setError(null);
+    window.google.accounts.id.prompt((notification) => {
+      if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+        // Prompt blokkert (f.eks. av Safari) — vis knapp i stedet
+        if (btnRef.current) {
+          window.google.accounts.id.renderButton(btnRef.current, {
+            type: "standard",
+            theme: "outline",
+            size: "large",
+            text: "signin_with",
+            locale: "nb",
+          });
+          btnRef.current.querySelector("div[role=button]")?.click();
+        }
+      }
+    });
+  }
+
+  return (
+    <div className="garnlager-root">
+      <style>{GARNLAGER_CSS}</style>
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"center", height:"100vh", padding:20 }}>
+        <div style={{ textAlign:"center", maxWidth:360 }}>
+          <div style={{ fontSize:56, marginBottom:16 }}>🧶</div>
+          <h1 style={{ fontFamily:"var(--font-display)", fontStyle:"italic", fontSize:38,
+            margin:"0 0 10px 0", color:"var(--walnut)" }}>Garnlager</h1>
+          <p style={{ color:"var(--walnut-soft)", fontSize:14, lineHeight:1.6, margin:"0 0 28px 0" }}>
+            Logg inn med Google for å få tilgang til garnlageret ditt — synkronisert på alle enheter.
+          </p>
+          {error && <p style={{ color:"var(--terracotta)", fontSize:13, marginBottom:16 }}>{error}</p>}
+          <button className="btn" onClick={handleSignIn} disabled={!gsiReady}
+            style={{ fontSize:15, padding:"13px 28px", width:"100%", justifyContent:"center", marginBottom:16 }}>
+            {gsiReady ? "🔑  Logg inn med Google" : "Laster …"}
+          </button>
+          {/* Fallback GSI-knapp (vises om prompt blokkeres) */}
+          <div ref={btnRef} style={{ display:"flex", justifyContent:"center" }}></div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function App() {
   const [tab, setTab] = useState("garn");
   const [yarns, setYarns] = useState(null);
@@ -410,60 +511,31 @@ function App() {
   const [projects, setProjects] = useState(null);
   const [toast, setToast] = useState(null);
   const [loaded, setLoaded] = useState(false);
-  const [user, setUser] = useState(undefined); // undefined = sjekker ennå, null = ikke innlogget
-  const [signingIn, setSigningIn] = useState(false);
+  const [user, setUser] = useState(undefined); // undefined = sjekker, null = ikke innlogget
 
-  // Auth: håndter redirect-resultat FØR onAuthStateChanged setter user=null
+  // Sjekk om bruker er lagret lokalt
   useEffect(() => {
-    let unsubscribed = false;
-
-    async function init() {
-      try {
-        // Sett lokal persistens (overlever Safari-restart)
-        await window._auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
-      } catch(e) {}
-
-      // VIKTIG: vent på redirect-resultat før vi lytter på auth-state
-      // Safari: etter redirect er currentUser null i et øyeblikk før getRedirectResult løser seg
-      try {
-        const result = await window._auth.getRedirectResult();
-        if (result && result.user) {
-          // Redirect-innlogging vellykket — onAuthStateChanged vil nå fange den
-        }
-      } catch(e) {
-        console.error("Redirect-feil:", e.code, e.message);
-      }
-
-      // Nå kan vi lytte trygt
-      const unsub = window._auth.onAuthStateChanged(async (u) => {
-        if (unsubscribed) return;
-        setUser(u || null);
-        if (u) {
-          const [y, t, p] = await Promise.all([
-            loadData("yarns", u.uid, []),
-            loadData("tools", u.uid, []),
-            loadData("projects", u.uid, []),
-          ]);
-          if (!unsubscribed) {
-            setYarns(y); setTools(t); setProjects(p);
-            setLoaded(true);
-          }
-        } else {
-          setYarns(null); setTools(null); setProjects(null);
-          setLoaded(false);
-        }
-      });
-
-      return unsub;
+    const stored = window._getStoredUser();
+    if (stored && stored.uid) {
+      setUser(stored);
+    } else {
+      setUser(null);
     }
-
-    let unsubFn = null;
-    init().then(fn => { unsubFn = fn; });
-    return () => {
-      unsubscribed = true;
-      if (unsubFn) unsubFn();
-    };
   }, []);
+
+  // Last data fra Firestore når bruker er satt
+  useEffect(() => {
+    if (!user || !user.uid) return;
+    (async () => {
+      const [y, t, p] = await Promise.all([
+        loadData("yarns", user.uid, []),
+        loadData("tools", user.uid, []),
+        loadData("projects", user.uid, []),
+      ]);
+      setYarns(y); setTools(t); setProjects(p);
+      setLoaded(true);
+    })();
+  }, [user]);
 
   // Auto-save
   useEffect(() => { if (loaded && user && yarns !== null) saveData("yarns", yarns, user.uid); }, [yarns, loaded]);
@@ -475,23 +547,27 @@ function App() {
     setTimeout(() => setToast(null), 2200);
   }
 
-  function handleSignIn() {
-    setSigningIn(true);
-    const provider = new firebase.auth.GoogleAuthProvider();
-    provider.setCustomParameters({ prompt: "select_account" });
-    window._auth.signInWithRedirect(provider);
+  function handleLogin(u) {
+    setUser(u);
   }
 
   function handleSignOut() {
-    window._auth.signOut();
+    window._setStoredUser(null);
+    if (window.google && window.google.accounts) {
+      window.google.accounts.id.disableAutoSelect();
+    }
+    setUser(null);
+    setLoaded(false);
+    setYarns(null); setTools(null); setProjects(null);
   }
 
-  // Sjekker auth
+  // Sjekker lagret bruker
   if (user === undefined) {
     return (
       <div className="garnlager-root">
         <style>{GARNLAGER_CSS}</style>
-        <div style={{ display:"flex", alignItems:"center", justifyContent:"center", height:"100vh", flexDirection:"column", gap:12, color:"var(--walnut-soft)", fontFamily:"var(--font-body)" }}>
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"center", height:"100vh",
+          flexDirection:"column", gap:12, color:"var(--walnut-soft)", fontFamily:"var(--font-body)" }}>
           <span style={{ fontSize:40 }}>🧶</span>
           <p style={{ margin:0 }}>Kobler til …</p>
         </div>
@@ -501,32 +577,16 @@ function App() {
 
   // Ikke innlogget
   if (!user) {
-    return (
-      <div className="garnlager-root">
-        <style>{GARNLAGER_CSS}</style>
-        <div style={{ display:"flex", alignItems:"center", justifyContent:"center", height:"100vh", padding:20 }}>
-          <div style={{ textAlign:"center", maxWidth:360 }}>
-            <div style={{ fontSize:56, marginBottom:16 }}>🧶</div>
-            <h1 style={{ fontFamily:"var(--font-display)", fontStyle:"italic", fontSize:38, margin:"0 0 10px 0", color:"var(--walnut)" }}>Garnlager</h1>
-            <p style={{ color:"var(--walnut-soft)", fontSize:14, lineHeight:1.6, margin:"0 0 28px 0" }}>
-              Logg inn med Google for å få tilgang til garnlageret ditt — synkronisert på alle enheter.
-            </p>
-            <button className="btn" onClick={handleSignIn} disabled={signingIn}
-              style={{ fontSize:15, padding:"13px 28px", width:"100%", justifyContent:"center" }}>
-              {signingIn ? "Logger inn …" : "🔑  Logg inn med Google"}
-            </button>
-          </div>
-        </div>
-      </div>
-    );
+    return <LoginScreen onLogin={handleLogin} />;
   }
 
-  // Laster data etter innlogging
+  // Laster data
   if (!loaded) {
     return (
       <div className="garnlager-root">
         <style>{GARNLAGER_CSS}</style>
-        <div style={{ display:"flex", alignItems:"center", justifyContent:"center", height:"100vh", flexDirection:"column", gap:12, color:"var(--walnut-soft)", fontFamily:"var(--font-body)" }}>
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"center", height:"100vh",
+          flexDirection:"column", gap:12, color:"var(--walnut-soft)", fontFamily:"var(--font-body)" }}>
           <span style={{ fontSize:40 }}>🧶</span>
           <p style={{ margin:0 }}>Laster garnlageret ditt …</p>
         </div>
