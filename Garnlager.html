@@ -1,0 +1,2879 @@
+<!DOCTYPE html>
+<html lang="nb">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Garnlager</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,400..600&family=Inter:wght@400;500;600;700&family=Space+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; padding: 0; }
+  #root { min-height: 100vh; }
+</style>
+</head>
+<body>
+<div id="root">
+  <div style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;color:#6E5C4B;text-align:center;padding:20px;">
+    <div>
+      <p>Laster Garnlager …</p>
+      <p style="font-size:13px;">Hvis dette ikke endrer seg innen et par sekunder, krever appen internett-tilkobling for å laste React fra CDN. Sjekk internettforbindelsen og åpne filen på nytt.</p>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone/babel.min.js"></script>
+
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useRef } = React;
+
+/* ============================================================
+   GARNLAGER — en oversikt over garn, redskap, prosjekter
+   og en håndbok om fiber, garngrupper og utregninger.
+   ============================================================ */
+
+const GARNGRUPPER = {
+  A: { navn: "Lace", strikkefasthet: "32-40+", meter: "300-500+", pinneStrikk: "1,5-2,5 mm", pinneHekle: "1,75-2,5 mm", farge: "#E8F0E6" },
+  AB: { navn: "Fingering", strikkefasthet: "26-30", meter: "250-300", pinneStrikk: "2,5-3,5 mm", pinneHekle: "2,25-3 mm", farge: "#FBEFE6" },
+  B: { navn: "Sport", strikkefasthet: "22-25", meter: "170-230", pinneStrikk: "3-4 mm", pinneHekle: "2,5-3 mm", farge: "#FBEFE6" },
+  C: { navn: "DK (double knit)", strikkefasthet: "20-22", meter: "140-170", pinneStrikk: "3,5-4,5 mm", pinneHekle: "4-5 mm", farge: "#EFE7F4" },
+  D: { navn: "Worsted", strikkefasthet: "16-18", meter: "80-100", pinneStrikk: "4,5-5,5 mm", pinneHekle: "4,5-5,5 mm", farge: "#FFF6D9" },
+  E: { navn: "Chunky", strikkefasthet: "12-15", meter: "50-70", pinneStrikk: "5,5-6 mm", pinneHekle: "6,5-9 mm", farge: "#E5F1F5" },
+  F: { navn: "Super bulky / Jumbo", strikkefasthet: "5-10", meter: "18-30", pinneStrikk: "6-8 mm+", pinneHekle: "9 mm+", farge: "#F4E5E0" },
+};
+
+const FIBERTYPER = [
+  "Ull", "Merinoull", "Alpakka", "Baby alpakka", "Lama", "Kashmir", "Mohair", "Yak", "Angora",
+  "Silke", "Lin", "Bomull", "Viskose", "Modal", "Lyocell", "Bambus",
+  "Akryl", "Nylon/Polyamid", "Polyester", "Blanding", "Annet"
+];
+
+const PROSJEKT_STATUS = ["Idé", "Planlagt", "Pågår", "Ferdig", "Lagt på vent"];
+
+const NEEDLE_TYPES = ["Rette pinner", "Rundpinner", "Strømpepinner (sett)", "Hjelpepinne", "Heklepinne", "Annet"];
+
+const STANDARD_SIZES_NEEDLE = ["2", "2.5", "3", "3.5", "4", "4.5", "5", "5.5", "6", "6.5", "7", "8", "9", "10", "12"];
+const STANDARD_SIZES_HOOK = ["2", "2.5", "3", "3.5", "4", "4.5", "5", "5.5", "6", "6.5", "7", "8", "9", "10"];
+const NEEDLE_LENGTHS = ["20 cm", "25 cm", "30 cm", "40 cm", "60 cm", "80 cm", "100 cm", "120 cm"];
+
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+
+const GARNLAGER_CSS = `
+  :root {
+    --cream: #F7F2EA;
+    --cream-deep: #EFE7D9;
+    --walnut: #4A3C30;
+    --walnut-soft: #6E5C4B;
+    --taupe: #C9AF97;
+    --taupe-line: #DDCBB8;
+    --moss: #4D5D4A;
+    --moss-soft: #7C8C76;
+    --terracotta: #C1644A;
+    --paper: #FFFDF9;
+    --shadow: rgba(74, 60, 48, 0.12);
+    --font-display: "Fraunces", Georgia, serif;
+    --font-body: "Inter", system-ui, sans-serif;
+    --font-mono: "Space Mono", "Courier New", monospace;
+  }
+  .garnlager-root * { box-sizing: border-box; }
+  .garnlager-root {
+    margin: 0; padding: 0;
+    background: var(--cream);
+    color: var(--walnut);
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+  .app-header {
+    position: sticky; top: 0; z-index: 50;
+    background: var(--cream);
+    border-bottom: 2px solid var(--walnut);
+    padding: 18px 20px 0 20px;
+  }
+  .header-inner {
+    max-width: 1080px; margin: 0 auto;
+    display: flex; align-items: baseline; justify-content: space-between;
+    flex-wrap: wrap; gap: 8px; padding-bottom: 14px;
+  }
+  .brand { display: flex; align-items: baseline; gap: 14px; }
+  .brand-mark {
+    font-family: var(--font-display); font-style: italic; font-weight: 600;
+    font-size: 34px; letter-spacing: -0.5px; color: var(--walnut);
+  }
+  .brand-sub {
+    font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--walnut-soft);
+    border: 1px solid var(--taupe-line); padding: 4px 8px;
+    border-radius: 100px; background: var(--paper);
+  }
+  .header-stats { display: flex; gap: 18px; font-family: var(--font-mono); font-size: 12px; color: var(--walnut-soft); }
+  .header-stats b {
+    color: var(--walnut); font-size: 15px; display: block;
+    font-family: var(--font-display); font-weight: 600;
+  }
+  .nav-tabs {
+    max-width: 1080px; margin: 0 auto; display: flex; gap: 6px;
+    overflow-x: auto; padding-bottom: 0; scrollbar-width: none;
+  }
+  .nav-tabs::-webkit-scrollbar { display: none; }
+  .nav-tab {
+    font-family: var(--font-body); font-weight: 600; font-size: 13.5px;
+    letter-spacing: 0.01em; padding: 10px 18px; border: none;
+    background: transparent; color: var(--walnut-soft); cursor: pointer;
+    border-radius: 10px 10px 0 0; white-space: nowrap; position: relative;
+    transition: color 0.15s ease, background 0.15s ease;
+  }
+  .nav-tab:hover { color: var(--walnut); background: var(--cream-deep); }
+  .nav-tab.active { color: var(--walnut); background: var(--paper); }
+  .nav-tab.active::after {
+    content: ""; position: absolute; bottom: -2px; left: 0; right: 0;
+    height: 2px; background: var(--terracotta);
+  }
+  .view { max-width: 1080px; margin: 0 auto; padding: 28px 20px 80px 20px; }
+  .view-header {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    gap: 16px; margin-bottom: 22px; flex-wrap: wrap;
+  }
+  .view-title { font-family: var(--font-display); font-weight: 600; font-size: 28px; margin: 0 0 4px 0; color: var(--walnut); }
+  .view-desc { font-size: 13.5px; color: var(--walnut-soft); max-width: 520px; line-height: 1.5; margin: 0; }
+  .btn {
+    font-family: var(--font-body); font-weight: 600; font-size: 13px;
+    border-radius: 8px; padding: 10px 16px; border: 1.5px solid var(--walnut);
+    background: var(--walnut); color: var(--cream); cursor: pointer;
+    transition: transform 0.1s ease, opacity 0.15s ease;
+    display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+  }
+  .btn:hover { opacity: 0.85; }
+  .btn:active { transform: scale(0.98); }
+  .btn-outline { background: transparent; color: var(--walnut); border: 1.5px solid var(--taupe-line); }
+  .btn-outline:hover { border-color: var(--walnut); opacity: 1; background: var(--cream-deep); }
+  .btn-danger { background: transparent; color: var(--terracotta); border: 1.5px solid var(--terracotta); }
+  .btn-danger:hover { background: rgba(193,100,74,0.08); opacity: 1; }
+  .btn-sm { padding: 6px 11px; font-size: 12px; border-radius: 6px; }
+  .btn-icon { padding: 8px; border-radius: 8px; }
+  .toolbar { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; align-items: center; }
+  .input, .select, textarea.input {
+    font-family: var(--font-body); font-size: 13.5px; padding: 10px 13px;
+    border-radius: 8px; border: 1.5px solid var(--taupe-line);
+    background: var(--paper); color: var(--walnut); outline: none;
+    transition: border-color 0.15s ease;
+  }
+  .input:focus, .select:focus, textarea.input:focus { border-color: var(--moss); }
+  .input::placeholder { color: #B8A893; }
+  .search-input { flex: 1; min-width: 180px; }
+  .chip-group { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip {
+    font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.04em;
+    padding: 7px 12px; border-radius: 100px; border: 1.5px solid var(--taupe-line);
+    background: var(--paper); color: var(--walnut-soft); cursor: pointer;
+    text-transform: uppercase; transition: all 0.15s ease;
+  }
+  .chip:hover { border-color: var(--moss-soft); color: var(--walnut); }
+  .chip.active { background: var(--moss); border-color: var(--moss); color: var(--cream); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
+  .yarn-card {
+    background: var(--paper); border: 1.5px solid var(--taupe-line); border-radius: 14px;
+    overflow: hidden; cursor: pointer; transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+    display: flex; flex-direction: column;
+  }
+  .yarn-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px var(--shadow); border-color: var(--moss-soft); }
+  .yarn-card-img { width: 100%; height: 140px; object-fit: cover; background: var(--cream-deep); display: block; }
+  .yarn-card-noimg { width: 100%; height: 140px; background: linear-gradient(135deg, var(--cream-deep), var(--taupe-line)); display: flex; align-items: center; justify-content: center; }
+  .yarn-card-body { padding: 12px 14px 14px 14px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
+  .yarn-card-title { font-family: var(--font-display); font-weight: 600; font-size: 16px; line-height: 1.25; margin: 0; color: var(--walnut); }
+  .yarn-card-meta { font-size: 12px; color: var(--walnut-soft); line-height: 1.4; }
+  .yarn-card-tags { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 4px; }
+  .tag {
+    font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.04em;
+    padding: 3px 8px; border-radius: 100px; background: var(--cream-deep);
+    color: var(--walnut-soft); text-transform: uppercase; border: 1px solid var(--taupe-line);
+  }
+  .tag.group-A { background: #E8F0E6; color: #4D5D4A; border-color: #C9DAC4; }
+  .tag.group-AB { background: #FBEFE6; color: #C1644A; border-color: #F2D6C5; }
+  .tag.group-B { background: #FBEFE6; color: #C1644A; border-color: #F2D6C5; }
+  .tag.group-C { background: #EFE7F4; color: #7A5C9E; border-color: #DBC9EC; }
+  .tag.group-D { background: #FFF6D9; color: #B8923A; border-color: #F5E5AE; }
+  .tag.group-E { background: #E5F1F5; color: #4178A0; border-color: #C8E2EC; }
+  .tag.group-F { background: #F4E5E0; color: #9C5B47; border-color: #E5C9C0; }
+  .yarn-card-amount {
+    margin-top: auto; padding-top: 8px; border-top: 1px dashed var(--taupe-line);
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-family: var(--font-mono); font-size: 12px; color: var(--walnut-soft);
+  }
+  .yarn-card-amount b { font-family: var(--font-display); font-size: 18px; font-weight: 600; color: var(--walnut); }
+  .swatch { width: 14px; height: 14px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.1); display: inline-block; flex-shrink: 0; }
+  .empty {
+    text-align: center; padding: 60px 20px; color: var(--walnut-soft);
+    border: 1.5px dashed var(--taupe-line); border-radius: 16px; background: var(--paper);
+  }
+  .empty-icon { font-size: 40px; margin-bottom: 12px; display: block; }
+  .empty h3 { font-family: var(--font-display); color: var(--walnut); margin: 0 0 6px 0; font-size: 19px; }
+  .empty p { margin: 0 0 16px 0; font-size: 13.5px; max-width: 360px; margin-left: auto; margin-right: auto; }
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(74, 60, 48, 0.45);
+    display: flex; align-items: center; justify-content: center; z-index: 200;
+    padding: 20px; backdrop-filter: blur(2px);
+  }
+  .modal {
+    background: var(--paper); border-radius: 16px; max-width: 560px; width: 100%;
+    max-height: 88vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+    border: 1px solid var(--taupe-line);
+  }
+  .modal-header {
+    padding: 20px 24px; border-bottom: 1.5px solid var(--taupe-line);
+    display: flex; justify-content: space-between; align-items: center;
+    position: sticky; top: 0; background: var(--paper); z-index: 1;
+  }
+  .modal-header h2 { font-family: var(--font-display); font-size: 21px; margin: 0; color: var(--walnut); }
+  .modal-close { background: none; border: none; font-size: 22px; color: var(--walnut-soft); cursor: pointer; line-height: 1; padding: 4px; }
+  .modal-close:hover { color: var(--walnut); }
+  .modal-body { padding: 20px 24px 24px 24px; }
+  .modal-footer {
+    padding: 16px 24px; border-top: 1.5px solid var(--taupe-line);
+    display: flex; justify-content: flex-end; gap: 10px;
+    position: sticky; bottom: 0; background: var(--paper);
+  }
+  .form-row { display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+  .form-field { flex: 1; min-width: 120px; display: flex; flex-direction: column; gap: 5px; }
+  .form-field label {
+    font-size: 11.5px; font-weight: 600; color: var(--walnut-soft);
+    text-transform: uppercase; letter-spacing: 0.05em; font-family: var(--font-mono);
+  }
+  .form-field input, .form-field select, .form-field textarea { width: 100%; }
+  textarea.input { resize: vertical; min-height: 60px; font-family: var(--font-body); }
+  .image-upload {
+    border: 1.5px dashed var(--taupe-line); border-radius: 10px; padding: 14px;
+    text-align: center; cursor: pointer; transition: border-color 0.15s ease;
+    background: var(--cream); font-size: 12.5px; color: var(--walnut-soft);
+  }
+  .image-upload:hover { border-color: var(--moss); }
+  .image-preview-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+  .image-preview-wrap { position: relative; width: 64px; height: 64px; }
+  .image-preview { width: 64px; height: 64px; object-fit: cover; border-radius: 8px; border: 1.5px solid var(--taupe-line); }
+  .image-preview-remove {
+    position: absolute; top: -6px; right: -6px; width: 20px; height: 20px;
+    border-radius: 50%; background: var(--terracotta); color: white; border: none;
+    font-size: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1;
+  }
+  .detail-grid { display: grid; grid-template-columns: 240px 1fr; gap: 24px; }
+  @media (max-width: 600px) { .detail-grid { grid-template-columns: 1fr; } }
+  .detail-images { display: flex; flex-direction: column; gap: 8px; }
+  .detail-img-main { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 12px; border: 1.5px solid var(--taupe-line); background: var(--cream-deep); }
+  .detail-thumbs { display: flex; gap: 6px; flex-wrap: wrap; }
+  .detail-thumb { width: 48px; height: 48px; object-fit: cover; border-radius: 6px; border: 1.5px solid var(--taupe-line); cursor: pointer; opacity: 0.7; }
+  .detail-thumb.active { opacity: 1; border-color: var(--moss); }
+  .detail-field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 18px; margin: 16px 0; }
+  .detail-field { font-size: 13px; }
+  .detail-field .label { font-family: var(--font-mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--walnut-soft); display: block; margin-bottom: 2px; }
+  .detail-field .value { color: var(--walnut); font-weight: 500; }
+  .progress-bar { height: 8px; border-radius: 100px; background: var(--cream-deep); overflow: hidden; margin-top: 4px; }
+  .progress-bar-fill { height: 100%; background: var(--moss); border-radius: 100px; transition: width 0.3s ease; }
+  .notes-block { background: var(--cream); border-radius: 10px; padding: 14px 16px; font-size: 13.5px; line-height: 1.6; color: var(--walnut-soft); white-space: pre-wrap; border: 1px solid var(--taupe-line); }
+  .handbook-layout { display: grid; grid-template-columns: 220px 1fr; gap: 28px; align-items: start; }
+  @media (max-width: 720px) { .handbook-layout { grid-template-columns: 1fr; } }
+  .handbook-toc { position: sticky; top: 100px; display: flex; flex-direction: column; gap: 2px; }
+  .handbook-toc-item {
+    font-family: var(--font-body); font-size: 13px; font-weight: 500; color: var(--walnut-soft);
+    padding: 8px 12px; border-radius: 8px; cursor: pointer; border: none; background: none;
+    text-align: left; transition: all 0.15s ease; border-left: 2px solid transparent;
+  }
+  .handbook-toc-item:hover { color: var(--walnut); background: var(--cream-deep); }
+  .handbook-toc-item.active { color: var(--moss); border-left: 2px solid var(--moss); font-weight: 600; background: var(--cream-deep); }
+  .handbook-content section { background: var(--paper); border: 1.5px solid var(--taupe-line); border-radius: 14px; padding: 24px 28px; margin-bottom: 20px; scroll-margin-top: 90px; }
+  .handbook-content h2 { font-family: var(--font-display); font-size: 22px; margin: 0 0 12px 0; color: var(--walnut); display: flex; align-items: center; gap: 10px; }
+  .handbook-content h3 { font-family: var(--font-display); font-style: italic; font-size: 17px; font-weight: 600; margin: 18px 0 8px 0; color: var(--moss); }
+  .handbook-content p { font-size: 14px; line-height: 1.65; color: var(--walnut-soft); margin: 0 0 12px 0; }
+  .handbook-content p:last-child { margin-bottom: 0; }
+  .handbook-content strong, .handbook-content b { color: var(--walnut); }
+  .fiber-row { display: flex; gap: 16px; margin-bottom: 14px; align-items: flex-start; }
+  .fiber-row img { width: 100px; height: 80px; object-fit: cover; border-radius: 8px; flex-shrink: 0; border: 1.5px solid var(--taupe-line); }
+  @media (max-width: 480px) { .fiber-row { flex-direction: column; } .fiber-row img { width: 100%; height: 120px; } }
+  .htable { width: 100%; border-collapse: collapse; font-size: 12.5px; margin: 14px 0; }
+  .htable th, .htable td { border: 1px solid var(--taupe-line); padding: 7px 9px; text-align: left; }
+  .htable th { background: var(--cream-deep); font-family: var(--font-mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--walnut-soft); }
+  .htable tr:nth-child(even) td { background: var(--cream); }
+  .callout { background: var(--cream-deep); border-left: 3px solid var(--moss); border-radius: 0 8px 8px 0; padding: 12px 16px; font-size: 13px; color: var(--walnut-soft); margin: 12px 0; }
+  .callout b { color: var(--moss); }
+  .callout.warn { border-left-color: var(--terracotta); }
+  .callout.warn b { color: var(--terracotta); }
+  .calc-card { background: var(--paper); border: 1.5px solid var(--taupe-line); border-radius: 14px; padding: 22px 24px; margin-bottom: 18px; }
+  .calc-card h3 { font-family: var(--font-display); font-size: 18px; margin: 0 0 4px 0; color: var(--walnut); }
+  .calc-card .calc-desc { font-size: 12.5px; color: var(--walnut-soft); margin: 0 0 14px 0; line-height: 1.5; }
+  .calc-result { margin-top: 14px; background: var(--cream); border-radius: 10px; padding: 14px 16px; font-family: var(--font-mono); font-size: 13px; color: var(--walnut); border: 1px solid var(--taupe-line); }
+  .calc-result .big { font-family: var(--font-display); font-size: 26px; font-weight: 600; color: var(--moss); }
+  .tool-table { width: 100%; border-collapse: collapse; background: var(--paper); border-radius: 14px; overflow: hidden; border: 1.5px solid var(--taupe-line); }
+  .tool-table th, .tool-table td { padding: 11px 14px; text-align: left; font-size: 13px; border-bottom: 1px solid var(--taupe-line); }
+  .tool-table th { font-family: var(--font-mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--walnut-soft); background: var(--cream-deep); }
+  .tool-table tr:last-child td { border-bottom: none; }
+  .tool-table tr:hover td { background: var(--cream); }
+  .project-card { background: var(--paper); border: 1.5px solid var(--taupe-line); border-radius: 14px; padding: 16px 18px; margin-bottom: 12px; display: flex; gap: 14px; align-items: flex-start; cursor: pointer; transition: all 0.15s ease; }
+  .project-card:hover { border-color: var(--moss-soft); box-shadow: 0 6px 18px var(--shadow); }
+  .project-img { width: 64px; height: 64px; border-radius: 8px; object-fit: cover; flex-shrink: 0; background: var(--cream-deep); }
+  .project-info { flex: 1; }
+  .project-title { font-family: var(--font-display); font-weight: 600; font-size: 17px; margin: 0 0 4px 0; color: var(--walnut); }
+  .project-meta { font-size: 12.5px; color: var(--walnut-soft); margin-bottom: 6px; }
+  .status-badge { font-family: var(--font-mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em; padding: 4px 10px; border-radius: 100px; flex-shrink: 0; }
+  .status-badge.planlagt { background: var(--cream-deep); color: var(--walnut-soft); }
+  .status-badge.pagaar { background: #FBEFE6; color: var(--terracotta); }
+  .status-badge.ferdig { background: #E8F0E6; color: var(--moss); }
+  .toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: var(--walnut); color: var(--cream); padding: 12px 22px;
+    border-radius: 100px; font-size: 13px; font-weight: 500; z-index: 300;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.25); animation: toast-in 0.25s ease;
+  }
+  @keyframes toast-in { from { opacity: 0; transform: translate(-50%, 10px); } to { opacity: 1; transform: translate(-50%, 0); } }
+  @media (max-width: 560px) { .header-stats { display: none; } .view-title { font-size: 24px; } }
+  @media (prefers-reduced-motion: reduce) { .garnlager-root * { transition: none !important; animation: none !important; } }
+  .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }
+  .garnlager-root :focus-visible { outline: 2px solid var(--moss); outline-offset: 2px; }
+`;
+
+
+/* ---------- storage helpers ---------- */
+async function loadData(key, fallback) {
+  try {
+    const res = await window.storage.get(key);
+    if (res && res.value) return JSON.parse(res.value);
+  } catch (e) {
+    /* not found, return fallback */
+  }
+  return fallback;
+}
+async function saveData(key, value) {
+  try {
+    await window.storage.set(key, JSON.stringify(value));
+    return true;
+  } catch (e) {
+    console.error("Lagring feilet", e);
+    return false;
+  }
+}
+
+/* ---------- image helpers ---------- */
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+// Resize image to keep storage small
+function resizeImage(dataUrl, maxDim = 800, quality = 0.78) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      let { width, height } = img;
+      if (width > maxDim || height > maxDim) {
+        if (width > height) {
+          height = Math.round((height * maxDim) / width);
+          width = maxDim;
+        } else {
+          width = Math.round((width * maxDim) / height);
+          height = maxDim;
+        }
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL("image/jpeg", quality));
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+}
+
+function App() {
+  const [tab, setTab] = useState("garn");
+  const [yarns, setYarns] = useState(null);
+  const [tools, setTools] = useState(null);
+  const [projects, setProjects] = useState(null);
+  const [toast, setToast] = useState(null);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const [y, t, p] = await Promise.all([
+        loadData("garnlager:yarns", []),
+        loadData("garnlager:tools", []),
+        loadData("garnlager:projects", []),
+      ]);
+      setYarns(y);
+      setTools(t);
+      setProjects(p);
+      setLoaded(true);
+    })();
+  }, []);
+
+  useEffect(() => { if (loaded && yarns !== null) saveData("garnlager:yarns", yarns); }, [yarns, loaded]);
+  useEffect(() => { if (loaded && tools !== null) saveData("garnlager:tools", tools); }, [tools, loaded]);
+  useEffect(() => { if (loaded && projects !== null) saveData("garnlager:projects", projects); }, [projects, loaded]);
+
+  function showToast(msg) {
+    setToast(msg);
+    setTimeout(() => setToast(null), 2200);
+  }
+
+  if (!loaded) {
+    return (
+      <div className="garnlager-root" style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", fontFamily: "Inter, sans-serif", color: "#6E5C4B" }}>
+        <style>{GARNLAGER_CSS}</style>
+        Laster garnlager…
+      </div>
+    );
+  }
+
+  const totalYarns = yarns.length;
+  const totalWeight = yarns.reduce((sum, y) => sum + (Number(y.gjenvaerendeVekt) || 0), 0);
+  const activeProjects = projects.filter(p => p.status === "Pågår").length;
+  const finishedProjects = projects.filter(p => p.status === "Ferdig").length;
+
+  return (
+    <div className="garnlager-root">
+      <style>{GARNLAGER_CSS}</style>
+      <header className="app-header">
+        <div className="header-inner">
+          <div className="brand">
+            <span className="brand-mark">Garnlager</span>
+          </div>
+          <div className="header-stats">
+            <div><b>{totalYarns}</b>nøster / poser</div>
+            <div><b>{(totalWeight / 1000).toFixed(1)} kg</b>totalvekt igjen</div>
+            <div><b>{activeProjects}</b>pågår</div>
+            <div><b>{finishedProjects}</b>ferdige</div>
+          </div>
+        </div>
+        <nav className="nav-tabs" aria-label="Hovednavigasjon">
+          <TabButton active={tab === "garn"} onClick={() => setTab("garn")}>Garnlager</TabButton>
+          <TabButton active={tab === "redskap"} onClick={() => setTab("redskap")}>Pinner &amp; redskap</TabButton>
+          <TabButton active={tab === "prosjekter"} onClick={() => setTab("prosjekter")}>Prosjekter</TabButton>
+          <TabButton active={tab === "kalkulator"} onClick={() => setTab("kalkulator")}>Kalkulator</TabButton>
+          <TabButton active={tab === "strikkehandbok"} onClick={() => setTab("strikkehandbok")}>Strikkehåndbok</TabButton>
+          <TabButton active={tab === "handbok"} onClick={() => setTab("handbok")}>Garnhåndbok</TabButton>
+        </nav>
+      </header>
+
+      <main className="view">
+        {tab === "garn" && <YarnView yarns={yarns} setYarns={setYarns} showToast={showToast} projects={projects} />}
+        {tab === "redskap" && <ToolsView tools={tools} setTools={setTools} showToast={showToast} />}
+        {tab === "prosjekter" && <ProjectsView projects={projects} setProjects={setProjects} yarns={yarns} setYarns={setYarns} showToast={showToast} />}
+        {tab === "kalkulator" && <CalculatorView />}
+        {tab === "strikkehandbok" && <QuickHandbookView />}
+        {tab === "handbok" && <HandbookView />}
+      </main>
+
+      {toast && <div className="toast" role="status">{toast}</div>}
+    </div>
+  );
+}
+
+function TabButton({ active, onClick, children }) {
+  return (
+    <button className={`nav-tab ${active ? "active" : ""}`} onClick={onClick} aria-current={active ? "page" : undefined}>
+      {children}
+    </button>
+  );
+}
+
+/* ============================================================
+   GARNLAGER — yarn inventory
+   ============================================================ */
+
+function emptyYarn() {
+  return {
+    id: uid(),
+    navn: "",
+    produsent: "",
+    farge: "",
+    fargekode: "#C9AF97",
+    fibertype: "Ull",
+    fibertypeDetalj: "",
+    garngruppe: "C",
+    lopelengdePer50g: "",
+    totalVekt: "",
+    gjenvaerendeVekt: "",
+    antallNoster: "",
+    notater: "",
+    bilder: [],
+  };
+}
+
+function YarnView({ yarns, setYarns, showToast, projects }) {
+  const [search, setSearch] = useState("");
+  const [filterGruppe, setFilterGruppe] = useState(null);
+  const [filterFiber, setFilterFiber] = useState(null);
+  const [editing, setEditing] = useState(null); // yarn object being edited, or null
+  const [viewing, setViewing] = useState(null); // yarn being viewed in detail
+  const [showAdd, setShowAdd] = useState(false);
+
+  const filtered = yarns.filter((y) => {
+    const matchesSearch =
+      !search ||
+      [y.navn, y.produsent, y.farge, y.fibertype, y.fibertypeDetalj, y.notater]
+        .join(" ")
+        .toLowerCase()
+        .includes(search.toLowerCase());
+    const matchesGruppe = !filterGruppe || y.garngruppe === filterGruppe;
+    const matchesFiber = !filterFiber || y.fibertype === filterFiber;
+    return matchesSearch && matchesGruppe && matchesFiber;
+  });
+
+  function handleSave(yarn) {
+    setYarns((prev) => {
+      const exists = prev.find((y) => y.id === yarn.id);
+      if (exists) return prev.map((y) => (y.id === yarn.id ? yarn : y));
+      return [yarn, ...prev];
+    });
+    setEditing(null);
+    setShowAdd(false);
+    setViewing(yarn);
+    showToast("Garn lagret");
+  }
+
+  function handleDelete(id) {
+    setYarns((prev) => prev.filter((y) => y.id !== id));
+    setViewing(null);
+    showToast("Garn fjernet fra lageret");
+  }
+
+  const usedFibers = [...new Set(yarns.map((y) => y.fibertype).filter(Boolean))];
+
+  return (
+    <div>
+      <div className="view-header">
+        <div>
+          <h1 className="view-title">Garnlager</h1>
+          <p className="view-desc">
+            Hold oversikt over garnet ditt — fibertype, farge, mengde og bilder. Klikk på et nøste for å se detaljer, justere gjenværende mengde eller koble det til et prosjekt.
+          </p>
+        </div>
+        <button className="btn" onClick={() => setShowAdd(true)}>+ Legg til garn</button>
+      </div>
+
+      <div className="toolbar">
+        <input
+          className="input search-input"
+          type="search"
+          placeholder="Søk på navn, produsent, farge, fiber…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          aria-label="Søk i garnlager"
+        />
+      </div>
+
+      <div className="toolbar">
+        <div className="chip-group" role="group" aria-label="Filtrer på garngruppe">
+          {Object.entries(GARNGRUPPER).map(([key, g]) => (
+            <button
+              key={key}
+              className={`chip ${filterGruppe === key ? "active" : ""}`}
+              onClick={() => setFilterGruppe(filterGruppe === key ? null : key)}
+            >
+              {key} · {g.navn}
+            </button>
+          ))}
+        </div>
+      </div>
+      {usedFibers.length > 0 && (
+        <div className="toolbar">
+          <div className="chip-group" role="group" aria-label="Filtrer på fibertype">
+            {usedFibers.map((f) => (
+              <button
+                key={f}
+                className={`chip ${filterFiber === f ? "active" : ""}`}
+                onClick={() => setFilterFiber(filterFiber === f ? null : f)}
+              >
+                {f}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {filtered.length === 0 ? (
+        <div className="empty">
+          <span className="empty-icon">🧶</span>
+          {yarns.length === 0 ? (
+            <>
+              <h3>Garnlageret er tomt</h3>
+              <p>Legg til det første nøstet ditt for å starte oversikten. Du kan legge til bilder, fibertype, farge og hvor mye du har igjen.</p>
+            </>
+          ) : (
+            <>
+              <h3>Ingen treff</h3>
+              <p>Ingen garn matcher søket eller filtrene dine. Prøv å justere eller nullstille filtrene.</p>
+            </>
+          )}
+          <button className="btn" onClick={() => setShowAdd(true)}>+ Legg til garn</button>
+        </div>
+      ) : (
+        <div className="grid">
+          {filtered.map((y) => (
+            <YarnCard key={y.id} yarn={y} onClick={() => setViewing(y)} />
+          ))}
+        </div>
+      )}
+
+      {(showAdd || editing) && (
+        <YarnFormModal
+          initial={editing || emptyYarn()}
+          onSave={handleSave}
+          onClose={() => { setShowAdd(false); setEditing(null); }}
+          isNew={!editing}
+        />
+      )}
+
+      {viewing && (
+        <YarnDetailModal
+          yarn={viewing}
+          projects={projects}
+          onClose={() => setViewing(null)}
+          onEdit={() => { setEditing(viewing); setViewing(null); }}
+          onDelete={() => handleDelete(viewing.id)}
+          onUpdate={(updated) => {
+            setYarns((prev) => prev.map((y) => (y.id === updated.id ? updated : y)));
+            setViewing(updated);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function YarnCard({ yarn, onClick }) {
+  const gruppe = GARNGRUPPER[yarn.garngruppe];
+  const totalMeter =
+    yarn.lopelengdePer50g && yarn.gjenvaerendeVekt
+      ? Math.round((Number(yarn.lopelengdePer50g) / 50) * Number(yarn.gjenvaerendeVekt))
+      : null;
+
+  return (
+    <div className="yarn-card" onClick={onClick} role="button" tabIndex={0}
+      onKeyDown={(e) => { if (e.key === "Enter") onClick(); }}>
+      {yarn.bilder && yarn.bilder.length > 0 ? (
+        <img className="yarn-card-img" src={yarn.bilder[0]} alt={yarn.navn || "Garn"} />
+      ) : (
+        <div className="yarn-card-noimg">
+          <span className="swatch" style={{ width: 36, height: 36, background: yarn.fargekode || "#C9AF97" }} />
+        </div>
+      )}
+      <div className="yarn-card-body">
+        <h3 className="yarn-card-title">{yarn.navn || "Uten navn"}</h3>
+        <div className="yarn-card-meta">
+          {yarn.produsent && <>{yarn.produsent} · </>}
+          {yarn.fibertype}
+        </div>
+        <div className="yarn-card-tags">
+          {gruppe && <span className={`tag group-${yarn.garngruppe}`}>{yarn.garngruppe} · {gruppe.navn}</span>}
+          {yarn.farge && (
+            <span className="tag" style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <span className="swatch" style={{ background: yarn.fargekode || "#C9AF97" }} /> {yarn.farge}
+            </span>
+          )}
+        </div>
+        <div className="yarn-card-amount">
+          <span>
+            {yarn.gjenvaerendeVekt ? `${yarn.gjenvaerendeVekt} g igjen` : "Vekt ikke angitt"}
+            {yarn.antallNoster ? ` · ${yarn.antallNoster} nøster` : ""}
+          </span>
+          {totalMeter !== null && <b>{totalMeter} m</b>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Yarn form modal ---------- */
+function YarnFormModal({ initial, onSave, onClose, isNew }) {
+  const [form, setForm] = useState(initial);
+  const fileInputRef = useRef(null);
+
+  function update(field, value) {
+    setForm((f) => ({ ...f, [field]: value }));
+  }
+
+  async function handleFiles(fileList) {
+    const files = Array.from(fileList).slice(0, 6 - (form.bilder?.length || 0));
+    const newImgs = [];
+    for (const file of files) {
+      const raw = await fileToDataUrl(file);
+      const resized = await resizeImage(raw);
+      newImgs.push(resized);
+    }
+    setForm((f) => ({ ...f, bilder: [...(f.bilder || []), ...newImgs] }));
+  }
+
+  function removeImage(idx) {
+    setForm((f) => ({ ...f, bilder: f.bilder.filter((_, i) => i !== idx) }));
+  }
+
+  function handleSubmit(e) {
+    e.preventDefault();
+    if (!form.navn.trim()) return;
+    onSave(form);
+  }
+
+  return (
+    <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="modal" role="dialog" aria-modal="true" aria-labelledby="yarn-modal-title">
+        <div className="modal-header">
+          <h2 id="yarn-modal-title">{isNew ? "Legg til garn" : "Rediger garn"}</h2>
+          <button className="modal-close" onClick={onClose} aria-label="Lukk">×</button>
+        </div>
+        <form onSubmit={handleSubmit}>
+          <div className="modal-body">
+            <div className="form-row">
+              <div className="form-field" style={{ flex: 2 }}>
+                <label htmlFor="navn">Navn på garn *</label>
+                <input id="navn" className="input" value={form.navn} onChange={(e) => update("navn", e.target.value)} placeholder="f.eks. Sandnes Tynn Merino" required />
+              </div>
+              <div className="form-field">
+                <label htmlFor="produsent">Produsent</label>
+                <input id="produsent" className="input" value={form.produsent} onChange={(e) => update("produsent", e.target.value)} placeholder="f.eks. Sandnes Garn" />
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="form-field">
+                <label htmlFor="farge">Farge / fargenavn</label>
+                <input id="farge" className="input" value={form.farge} onChange={(e) => update("farge", e.target.value)} placeholder="f.eks. Lys gråmelert" />
+              </div>
+              <div className="form-field" style={{ maxWidth: 90 }}>
+                <label htmlFor="fargekode">Fargekode</label>
+                <input id="fargekode" type="color" className="input" style={{ padding: 4, height: 40 }} value={form.fargekode || "#C9AF97"} onChange={(e) => update("fargekode", e.target.value)} />
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="form-field">
+                <label htmlFor="fibertype">Fibertype</label>
+                <select id="fibertype" className="select" value={form.fibertype} onChange={(e) => update("fibertype", e.target.value)}>
+                  {FIBERTYPER.map((f) => <option key={f} value={f}>{f}</option>)}
+                </select>
+              </div>
+              <div className="form-field">
+                <label htmlFor="fibertypeDetalj">Detaljer om fiber</label>
+                <input id="fibertypeDetalj" className="input" value={form.fibertypeDetalj} onChange={(e) => update("fibertypeDetalj", e.target.value)} placeholder="f.eks. 80% ull / 20% nylon" />
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="form-field">
+                <label htmlFor="garngruppe">Garngruppe</label>
+                <select id="garngruppe" className="select" value={form.garngruppe} onChange={(e) => update("garngruppe", e.target.value)}>
+                  {Object.entries(GARNGRUPPER).map(([key, g]) => (
+                    <option key={key} value={key}>{key} — {g.navn}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-field">
+                <label htmlFor="lopelengde">Løpelengde (m / 50 g)</label>
+                <input id="lopelengde" className="input" type="number" min="0" value={form.lopelengdePer50g} onChange={(e) => update("lopelengdePer50g", e.target.value)} placeholder="f.eks. 105" />
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="form-field">
+                <label htmlFor="totalVekt">Total vekt da nytt (g)</label>
+                <input id="totalVekt" className="input" type="number" min="0" value={form.totalVekt} onChange={(e) => update("totalVekt", e.target.value)} placeholder="f.eks. 500" />
+              </div>
+              <div className="form-field">
+                <label htmlFor="gjenvaerendeVekt">Gjenværende vekt (g)</label>
+                <input id="gjenvaerendeVekt" className="input" type="number" min="0" value={form.gjenvaerendeVekt} onChange={(e) => update("gjenvaerendeVekt", e.target.value)} placeholder="f.eks. 350" />
+              </div>
+              <div className="form-field">
+                <label htmlFor="antallNoster">Antall nøster/dotter</label>
+                <input id="antallNoster" className="input" type="number" min="0" value={form.antallNoster} onChange={(e) => update("antallNoster", e.target.value)} placeholder="f.eks. 3" />
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="form-field">
+                <label htmlFor="notater">Notater</label>
+                <textarea id="notater" className="input" value={form.notater} onChange={(e) => update("notater", e.target.value)} placeholder="Kjøpt på loppemarked, planlagt til sokker, vasket en gang…" />
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="form-field">
+                <label>Bilder (garn, banderoll, hylle …)</label>
+                <div className="image-upload" onClick={() => fileInputRef.current?.click()}>
+                  📷 Trykk for å laste opp bilde(r) — maks 6
+                </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="visually-hidden"
+                  onChange={(e) => { if (e.target.files.length) handleFiles(e.target.files); e.target.value = ""; }}
+                />
+                {form.bilder && form.bilder.length > 0 && (
+                  <div className="image-preview-row">
+                    {form.bilder.map((src, i) => (
+                      <div className="image-preview-wrap" key={i}>
+                        <img className="image-preview" src={src} alt={`Bilde ${i + 1}`} />
+                        <button type="button" className="image-preview-remove" onClick={() => removeImage(i)} aria-label="Fjern bilde">×</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+          <div className="modal-footer">
+            <button type="button" className="btn btn-outline" onClick={onClose}>Avbryt</button>
+            <button type="submit" className="btn">Lagre garn</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Yarn detail modal ---------- */
+function YarnDetailModal({ yarn, onClose, onEdit, onDelete, onUpdate, projects }) {
+  const [activeImg, setActiveImg] = useState(0);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  const gruppe = GARNGRUPPER[yarn.garngruppe];
+  const totalMeter =
+    yarn.lopelengdePer50g && yarn.gjenvaerendeVekt
+      ? Math.round((Number(yarn.lopelengdePer50g) / 50) * Number(yarn.gjenvaerendeVekt))
+      : null;
+
+  const usedInProjects = projects.filter((p) => (p.garnIds || []).includes(yarn.id));
+
+  function adjustWeight(delta) {
+    const current = Number(yarn.gjenvaerendeVekt) || 0;
+    const next = Math.max(0, current + delta);
+    onUpdate({ ...yarn, gjenvaerendeVekt: next });
+  }
+
+  return (
+    <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="modal" role="dialog" aria-modal="true" aria-labelledby="yarn-detail-title" style={{ maxWidth: 680 }}>
+        <div className="modal-header">
+          <h2 id="yarn-detail-title">{yarn.navn || "Uten navn"}</h2>
+          <button className="modal-close" onClick={onClose} aria-label="Lukk">×</button>
+        </div>
+        <div className="modal-body">
+          <div className="detail-grid">
+            <div className="detail-images">
+              {yarn.bilder && yarn.bilder.length > 0 ? (
+                <>
+                  <img className="detail-img-main" src={yarn.bilder[activeImg]} alt={yarn.navn} />
+                  {yarn.bilder.length > 1 && (
+                    <div className="detail-thumbs">
+                      {yarn.bilder.map((src, i) => (
+                        <img
+                          key={i}
+                          className={`detail-thumb ${i === activeImg ? "active" : ""}`}
+                          src={src}
+                          alt={`Bilde ${i + 1}`}
+                          onClick={() => setActiveImg(i)}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="detail-img-main" style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <span className="swatch" style={{ width: 56, height: 56, background: yarn.fargekode || "#C9AF97" }} />
+                </div>
+              )}
+            </div>
+
+            <div>
+              <div className="yarn-card-tags" style={{ marginBottom: 4 }}>
+                {gruppe && <span className={`tag group-${yarn.garngruppe}`}>{yarn.garngruppe} · {gruppe.navn}</span>}
+                {yarn.farge && (
+                  <span className="tag" style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    <span className="swatch" style={{ background: yarn.fargekode || "#C9AF97" }} /> {yarn.farge}
+                  </span>
+                )}
+              </div>
+
+              <div className="detail-field-grid">
+                <div className="detail-field">
+                  <span className="label">Produsent</span>
+                  <span className="value">{yarn.produsent || "—"}</span>
+                </div>
+                <div className="detail-field">
+                  <span className="label">Fibertype</span>
+                  <span className="value">{yarn.fibertype}{yarn.fibertypeDetalj ? ` (${yarn.fibertypeDetalj})` : ""}</span>
+                </div>
+                <div className="detail-field">
+                  <span className="label">Løpelengde</span>
+                  <span className="value">{yarn.lopelengdePer50g ? `${yarn.lopelengdePer50g} m / 50 g` : "—"}</span>
+                </div>
+                <div className="detail-field">
+                  <span className="label">Total meter igjen</span>
+                  <span className="value">{totalMeter !== null ? `≈ ${totalMeter} m` : "—"}</span>
+                </div>
+                <div className="detail-field">
+                  <span className="label">Total vekt da nytt</span>
+                  <span className="value">{yarn.totalVekt ? `${yarn.totalVekt} g` : "—"}</span>
+                </div>
+                <div className="detail-field">
+                  <span className="label">Antall nøster</span>
+                  <span className="value">{yarn.antallNoster || "—"}</span>
+                </div>
+              </div>
+
+              <div className="detail-field" style={{ marginBottom: 14 }}>
+                <span className="label">Gjenværende vekt</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 4 }}>
+                  <button className="btn btn-outline btn-sm" onClick={() => adjustWeight(-50)} aria-label="Trekk fra 50 gram">−50 g</button>
+                  <span className="value" style={{ fontFamily: "var(--font-display)", fontSize: 20, minWidth: 70, textAlign: "center" }}>
+                    {yarn.gjenvaerendeVekt || 0} g
+                  </span>
+                  <button className="btn btn-outline btn-sm" onClick={() => adjustWeight(50)} aria-label="Legg til 50 gram">+50 g</button>
+                </div>
+                {yarn.totalVekt > 0 && (
+                  <div className="progress-bar">
+                    <div className="progress-bar-fill" style={{ width: `${Math.min(100, (Number(yarn.gjenvaerendeVekt || 0) / Number(yarn.totalVekt)) * 100)}%` }} />
+                  </div>
+                )}
+              </div>
+
+              {yarn.notater && (
+                <div className="detail-field" style={{ marginBottom: 14 }}>
+                  <span className="label">Notater</span>
+                  <div className="notes-block">{yarn.notater}</div>
+                </div>
+              )}
+
+              {usedInProjects.length > 0 && (
+                <div className="detail-field">
+                  <span className="label">Brukes i prosjekt</span>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 4 }}>
+                    {usedInProjects.map((p) => (
+                      <span key={p.id} className={`status-badge ${p.status === "Ferdig" ? "ferdig" : p.status === "Pågår" ? "pagaar" : "planlagt"}`}>{p.navn}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+        <div className="modal-footer" style={{ justifyContent: "space-between" }}>
+          {confirmDelete ? (
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <span style={{ fontSize: 13, color: "var(--walnut-soft)" }}>Slette dette garnet?</span>
+              <button className="btn btn-danger btn-sm" onClick={onDelete}>Ja, slett</button>
+              <button className="btn btn-outline btn-sm" onClick={() => setConfirmDelete(false)}>Avbryt</button>
+            </div>
+          ) : (
+            <button className="btn btn-danger btn-sm" onClick={() => setConfirmDelete(true)}>Slett garn</button>
+          )}
+          <button className="btn btn-outline" onClick={onEdit}>Rediger</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   PINNER & REDSKAP — needle/hook inventory
+   ============================================================ */
+
+function emptyTool() {
+  return {
+    id: uid(),
+    type: "Rundpinner",
+    storrelse: "4",
+    lengde: "60 cm",
+    merke: "",
+    antall: 1,
+    notater: "",
+  };
+}
+
+function ToolsView({ tools, setTools, showToast }) {
+  const [editing, setEditing] = useState(null);
+  const [showAdd, setShowAdd] = useState(false);
+  const [filterType, setFilterType] = useState(null);
+
+  function handleSave(tool) {
+    setTools((prev) => {
+      const exists = prev.find((t) => t.id === tool.id);
+      if (exists) return prev.map((t) => (t.id === tool.id ? tool : t));
+      return [...prev, tool];
+    });
+    setEditing(null);
+    setShowAdd(false);
+    showToast("Redskap lagret");
+  }
+
+  function handleDelete(id) {
+    setTools((prev) => prev.filter((t) => t.id !== id));
+    showToast("Redskap fjernet");
+  }
+
+  const filtered = tools.filter((t) => !filterType || t.type === filterType);
+
+  // sort by type, then by numeric size
+  const sorted = [...filtered].sort((a, b) => {
+    if (a.type !== b.type) return a.type.localeCompare(b.type);
+    return parseFloat(a.storrelse) - parseFloat(b.storrelse);
+  });
+
+  return (
+    <div>
+      <div className="view-header">
+        <div>
+          <h1 className="view-title">Pinner &amp; redskap</h1>
+          <p className="view-desc">
+            Oversikt over strikkepinner, heklepinner og annet tilbehør du har — størrelser, lengder og antall. Sammenlign med pinneanbefalinger i håndboken når du planlegger et prosjekt.
+          </p>
+        </div>
+        <button className="btn" onClick={() => setShowAdd(true)}>+ Legg til redskap</button>
+      </div>
+
+      <div className="toolbar">
+        <div className="chip-group" role="group" aria-label="Filtrer på type">
+          {NEEDLE_TYPES.map((t) => (
+            <button key={t} className={`chip ${filterType === t ? "active" : ""}`} onClick={() => setFilterType(filterType === t ? null : t)}>
+              {t}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {sorted.length === 0 ? (
+        <div className="empty">
+          <span className="empty-icon">🪡</span>
+          <h3>Ingen redskap registrert</h3>
+          <p>Legg inn strikkepinner, heklepinner, rundpinner og strømpepinnesett med størrelse og lengde, så har du full oversikt neste gang du skal sette i gang med et prosjekt.</p>
+          <button className="btn" onClick={() => setShowAdd(true)}>+ Legg til redskap</button>
+        </div>
+      ) : (
+        <table className="tool-table">
+          <thead>
+            <tr>
+              <th>Type</th>
+              <th>Størrelse</th>
+              <th>Lengde</th>
+              <th>Merke</th>
+              <th>Antall</th>
+              <th>Notater</th>
+              <th aria-label="Handlinger"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map((t) => (
+              <tr key={t.id}>
+                <td>{t.type}</td>
+                <td>{t.storrelse} mm</td>
+                <td>{t.lengde || "—"}</td>
+                <td>{t.merke || "—"}</td>
+                <td>{t.antall}</td>
+                <td style={{ color: "var(--walnut-soft)" }}>{t.notater || "—"}</td>
+                <td style={{ whiteSpace: "nowrap" }}>
+                  <button className="btn btn-outline btn-sm" onClick={() => setEditing(t)}>Rediger</button>{" "}
+                  <button className="btn btn-danger btn-sm" onClick={() => handleDelete(t.id)}>Slett</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+
+      {(showAdd || editing) && (
+        <ToolFormModal
+          initial={editing || emptyTool()}
+          onSave={handleSave}
+          onClose={() => { setShowAdd(false); setEditing(null); }}
+          isNew={!editing}
+        />
+      )}
+    </div>
+  );
+}
+
+function ToolFormModal({ initial, onSave, onClose, isNew }) {
+  const [form, setForm] = useState(initial);
+  const isHook = form.type === "Heklepinne";
+  const sizeOptions = isHook ? STANDARD_SIZES_HOOK : STANDARD_SIZES_NEEDLE;
+
+  function update(field, value) {
+    setForm((f) => ({ ...f, [field]: value }));
+  }
+
+  function handleSubmit(e) {
+    e.preventDefault();
+    onSave(form);
+  }
+
+  return (
+    <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="modal" role="dialog" aria-modal="true" aria-labelledby="tool-modal-title">
+        <div className="modal-header">
+          <h2 id="tool-modal-title">{isNew ? "Legg til redskap" : "Rediger redskap"}</h2>
+          <button className="modal-close" onClick={onClose} aria-label="Lukk">×</button>
+        </div>
+        <form onSubmit={handleSubmit}>
+          <div className="modal-body">
+            <div className="form-row">
+              <div className="form-field">
+                <label htmlFor="type">Type</label>
+                <select id="type" className="select" value={form.type} onChange={(e) => update("type", e.target.value)}>
+                  {NEEDLE_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+              <div className="form-field">
+                <label htmlFor="storrelse">Størrelse (mm)</label>
+                <input id="storrelse" className="input" list="size-options" value={form.storrelse} onChange={(e) => update("storrelse", e.target.value)} placeholder="f.eks. 4" />
+                <datalist id="size-options">
+                  {sizeOptions.map((s) => <option key={s} value={s} />)}
+                </datalist>
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-field">
+                <label htmlFor="lengde">Lengde</label>
+                <input id="lengde" className="input" list="length-options" value={form.lengde} onChange={(e) => update("lengde", e.target.value)} placeholder="f.eks. 60 cm" />
+                <datalist id="length-options">
+                  {NEEDLE_LENGTHS.map((l) => <option key={l} value={l} />)}
+                </datalist>
+              </div>
+              <div className="form-field">
+                <label htmlFor="antall">Antall</label>
+                <input id="antall" className="input" type="number" min="1" value={form.antall} onChange={(e) => update("antall", e.target.value)} />
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-field">
+                <label htmlFor="merke">Merke</label>
+                <input id="merke" className="input" value={form.merke} onChange={(e) => update("merke", e.target.value)} placeholder="f.eks. KnitPro, Addi, Prym" />
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-field">
+                <label htmlFor="tool-notater">Notater</label>
+                <textarea id="tool-notater" className="input" value={form.notater} onChange={(e) => update("notater", e.target.value)} placeholder="f.eks. Lett bøyelig, savnet endestopper" />
+              </div>
+            </div>
+          </div>
+          <div className="modal-footer">
+            <button type="button" className="btn btn-outline" onClick={onClose}>Avbryt</button>
+            <button type="submit" className="btn">Lagre</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   PROSJEKTER — project tracker
+   ============================================================ */
+
+function emptyProject() {
+  return {
+    id: uid(),
+    navn: "",
+    type: "",
+    status: "Planlagt",
+    oppskrift: "",
+    pinneStorrelse: "",
+    garnBruk: {},   // { yarnId: gramsUsed }
+    garnIds: [],    // kept for backwards compat, derived from garnBruk
+    startdato: "",
+    sluttdato: "",
+    notater: "",
+    bilder: [],
+  };
+}
+
+function ProjectsView({ projects, setProjects, yarns, setYarns, showToast }) {
+  const [editing, setEditing] = useState(null);
+  const [showAdd, setShowAdd] = useState(false);
+  const [viewing, setViewing] = useState(null);
+  const [filterStatus, setFilterStatus] = useState(null);
+
+  function handleSave(project, prevProject) {
+    // Sync garnIds from garnBruk keys for backwards compat
+    const garnBruk = project.garnBruk || {};
+    const updatedProject = {
+      ...project,
+      garnIds: Object.keys(garnBruk).filter(id => (Number(garnBruk[id]) || 0) > 0 || garnBruk[id] === "linked"),
+    };
+
+    // Apply gram deductions: compare old garnBruk vs new garnBruk
+    const prevBruk = (prevProject && prevProject.garnBruk) || {};
+    setYarns(prev => prev.map(yarn => {
+      const prevGrams = Number(prevBruk[yarn.id]) || 0;
+      const newGrams = Number(garnBruk[yarn.id]) || 0;
+      const diff = newGrams - prevGrams;
+      if (diff === 0) return yarn;
+      const current = Number(yarn.gjenvaerendeVekt) || 0;
+      return { ...yarn, gjenvaerendeVekt: Math.max(0, current - diff) };
+    }));
+
+    setProjects((prev) => {
+      const exists = prev.find((p) => p.id === updatedProject.id);
+      if (exists) return prev.map((p) => (p.id === updatedProject.id ? updatedProject : p));
+      return [updatedProject, ...prev];
+    });
+    setEditing(null);
+    setShowAdd(false);
+    setViewing(updatedProject);
+    showToast("Prosjekt lagret — garnlager oppdatert");
+  }
+
+  function handleDelete(id) {
+    setProjects((prev) => prev.filter((p) => p.id !== id));
+    setViewing(null);
+    showToast("Prosjekt fjernet");
+  }
+
+  const filtered = projects.filter((p) => !filterStatus || p.status === filterStatus);
+
+  // Sort: Pågår first, then Planlagt/Idé, then Ferdig, then Lagt på vent
+  const order = { "Pågår": 0, "Idé": 1, "Planlagt": 1, "Lagt på vent": 2, "Ferdig": 3 };
+  const sorted = [...filtered].sort((a, b) => (order[a.status] ?? 9) - (order[b.status] ?? 9));
+
+  function statusClass(status) {
+    if (status === "Ferdig") return "ferdig";
+    if (status === "Pågår") return "pagaar";
+    return "planlagt";
+  }
+
+  return (
+    <div>
+      <div className="view-header">
+        <div>
+          <h1 className="view-title">Prosjekter</h1>
+          <p className="view-desc">
+            Hold rede på hva du strikker eller hekler nå, hva du planlegger, og hva du har fullført. Koble prosjekter til garnet du bruker for å se hvilket garn som er i bruk.
+          </p>
+        </div>
+        <button className="btn" onClick={() => setShowAdd(true)}>+ Nytt prosjekt</button>
+      </div>
+
+      <div className="toolbar">
+        <div className="chip-group" role="group" aria-label="Filtrer på status">
+          {PROSJEKT_STATUS.map((s) => (
+            <button key={s} className={`chip ${filterStatus === s ? "active" : ""}`} onClick={() => setFilterStatus(filterStatus === s ? null : s)}>
+              {s}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {sorted.length === 0 ? (
+        <div className="empty">
+          <span className="empty-icon">🧣</span>
+          {projects.length === 0 ? (
+            <>
+              <h3>Ingen prosjekter ennå</h3>
+              <p>Legg til prosjektet du jobber med — koble det til garn fra lageret, og oppdater status fra idé til ferdig.</p>
+            </>
+          ) : (
+            <>
+              <h3>Ingen treff</h3>
+              <p>Ingen prosjekter med denne statusen. Prøv et annet filter.</p>
+            </>
+          )}
+          <button className="btn" onClick={() => setShowAdd(true)}>+ Nytt prosjekt</button>
+        </div>
+      ) : (
+        <div>
+          {sorted.map((p) => {
+            const linkedYarns = yarns.filter((y) => {
+              const ids = p.garnIds || Object.keys(p.garnBruk || {});
+              return ids.includes(y.id);
+            });
+            return (
+              <div className="project-card" key={p.id} onClick={() => setViewing(p)} role="button" tabIndex={0}
+                onKeyDown={(e) => { if (e.key === "Enter") setViewing(p); }}>
+                {p.bilder && p.bilder.length > 0 ? (
+                  <img className="project-img" src={p.bilder[0]} alt={p.navn} />
+                ) : (
+                  <div className="project-img" style={{ display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>🧶</div>
+                )}
+                <div className="project-info">
+                  <h3 className="project-title">{p.navn || "Uten navn"}</h3>
+                  <div className="project-meta">
+                    {p.type && <>{p.type} · </>}
+                    {linkedYarns.length > 0 ? `${linkedYarns.length} garn koblet` : "Ingen garn koblet"}
+                    {p.pinneStorrelse && ` · pinne ${p.pinneStorrelse} mm`}
+                  </div>
+                  {p.notater && <div style={{ fontSize: 12.5, color: "var(--walnut-soft)" }}>{p.notater.slice(0, 100)}{p.notater.length > 100 ? "…" : ""}</div>}
+                </div>
+                <span className={`status-badge ${statusClass(p.status)}`}>{p.status}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {(showAdd || editing) && (
+        <ProjectFormModal
+          initial={editing || emptyProject()}
+          prevProject={editing}
+          yarns={yarns}
+          onSave={handleSave}
+          onClose={() => { setShowAdd(false); setEditing(null); }}
+          isNew={!editing}
+        />
+      )}
+
+      {viewing && (
+        <ProjectDetailModal
+          project={viewing}
+          yarns={yarns}
+          onClose={() => setViewing(null)}
+          onEdit={() => { setEditing(viewing); setViewing(null); }}
+          onDelete={() => handleDelete(viewing.id)}
+        />
+      )}
+    </div>
+  );
+}
+
+function ProjectFormModal({ initial, prevProject, yarns, onSave, onClose, isNew }) {
+  const [form, setForm] = useState(() => ({
+    ...initial,
+    garnBruk: initial.garnBruk || {},
+  }));
+  const fileInputRef = useRef(null);
+
+  function update(field, value) {
+    setForm((f) => ({ ...f, [field]: value }));
+  }
+
+  function toggleYarnLink(id) {
+    setForm((f) => {
+      const bruk = { ...f.garnBruk };
+      if (id in bruk) {
+        delete bruk[id];
+      } else {
+        bruk[id] = "";
+      }
+      return { ...f, garnBruk: bruk };
+    });
+  }
+
+  function setGrams(id, val) {
+    setForm((f) => ({ ...f, garnBruk: { ...f.garnBruk, [id]: val } }));
+  }
+
+  async function handleFiles(fileList) {
+    const files = Array.from(fileList).slice(0, 6 - (form.bilder?.length || 0));
+    const newImgs = [];
+    for (const file of files) {
+      const raw = await fileToDataUrl(file);
+      const resized = await resizeImage(raw);
+      newImgs.push(resized);
+    }
+    setForm((f) => ({ ...f, bilder: [...(f.bilder || []), ...newImgs] }));
+  }
+
+  function removeImage(idx) {
+    setForm((f) => ({ ...f, bilder: f.bilder.filter((_, i) => i !== idx) }));
+  }
+
+  function handleSubmit(e) {
+    e.preventDefault();
+    if (!form.navn.trim()) return;
+    onSave(form, prevProject);
+  }
+
+  const linkedYarnIds = Object.keys(form.garnBruk || {});
+
+  return (
+    <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="modal" role="dialog" aria-modal="true" aria-labelledby="project-modal-title">
+        <div className="modal-header">
+          <h2 id="project-modal-title">{isNew ? "Nytt prosjekt" : "Rediger prosjekt"}</h2>
+          <button className="modal-close" onClick={onClose} aria-label="Lukk">×</button>
+        </div>
+        <form onSubmit={handleSubmit}>
+          <div className="modal-body">
+            <div className="form-row">
+              <div className="form-field" style={{ flex: 2 }}>
+                <label htmlFor="pnavn">Navn på prosjekt *</label>
+                <input id="pnavn" className="input" value={form.navn} onChange={(e) => update("navn", e.target.value)} placeholder="f.eks. Cabled vrangbord-jakke" required />
+              </div>
+              <div className="form-field">
+                <label htmlFor="ptype">Type</label>
+                <input id="ptype" className="input" value={form.type} onChange={(e) => update("type", e.target.value)} placeholder="f.eks. Sjal, sokker, genser" />
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="form-field">
+                <label htmlFor="pstatus">Status</label>
+                <select id="pstatus" className="select" value={form.status} onChange={(e) => update("status", e.target.value)}>
+                  {PROSJEKT_STATUS.map((s) => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+              <div className="form-field">
+                <label htmlFor="ppinne">Pinnestørrelse (mm)</label>
+                <input id="ppinne" className="input" value={form.pinneStorrelse} onChange={(e) => update("pinneStorrelse", e.target.value)} placeholder="f.eks. 4" />
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="form-field">
+                <label htmlFor="poppskrift">Oppskrift / kilde</label>
+                <input id="poppskrift" className="input" value={form.oppskrift} onChange={(e) => update("oppskrift", e.target.value)} placeholder="f.eks. Drops design 12345, eller eget design" />
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="form-field">
+                <label htmlFor="pstart">Startet</label>
+                <input id="pstart" className="input" type="date" value={form.startdato} onChange={(e) => update("startdato", e.target.value)} />
+              </div>
+              <div className="form-field">
+                <label htmlFor="pferdig">Ferdig</label>
+                <input id="pferdig" className="input" type="date" value={form.sluttdato} onChange={(e) => update("sluttdato", e.target.value)} />
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="form-field">
+                <label>Garn brukt i prosjektet</label>
+                {yarns.length === 0 ? (
+                  <p style={{ fontSize: 12.5, color: "var(--walnut-soft)", margin: 0 }}>Du har ikke lagt inn garn i lageret ennå.</p>
+                ) : (
+                  <div>
+                    <p style={{ fontSize: 12, color: "var(--walnut-soft)", margin: "0 0 10px 0" }}>
+                      Trykk for å koble garn til prosjektet. Fyll inn gram brukt så trekkes det automatisk fra garnlageret når du lagrer.
+                    </p>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {yarns.map((y) => {
+                        const linked = y.id in (form.garnBruk || {});
+                        const grams = form.garnBruk?.[y.id] ?? "";
+                        return (
+                          <div key={y.id} style={{ display: "flex", alignItems: "center", gap: 10, background: linked ? "var(--cream)" : "transparent", borderRadius: 8, padding: linked ? "8px 12px" : "4px 0", border: linked ? "1.5px solid var(--taupe-line)" : "none", transition: "all 0.15s" }}>
+                            <button
+                              type="button"
+                              onClick={() => toggleYarnLink(y.id)}
+                              style={{ display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", cursor: "pointer", flex: 1, textAlign: "left", padding: 0 }}
+                            >
+                              <div style={{ width: 20, height: 20, borderRadius: 5, border: `1.5px solid ${linked ? "var(--moss)" : "var(--taupe-line)"}`, background: linked ? "var(--moss)" : "var(--paper)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: "white", fontSize: 13 }}>
+                                {linked ? "✓" : ""}
+                              </div>
+                              <span className="swatch" style={{ background: y.fargekode || "#C9AF97", width: 14, height: 14 }} />
+                              <span style={{ fontSize: 13, color: "var(--walnut)", fontWeight: linked ? 600 : 400 }}>{y.navn || "Uten navn"}</span>
+                              {y.gjenvaerendeVekt ? <span style={{ fontSize: 11, color: "var(--walnut-soft)" }}>({y.gjenvaerendeVekt} g igjen)</span> : null}
+                            </button>
+                            {linked && (
+                              <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                                <input
+                                  className="input"
+                                  type="number"
+                                  min="0"
+                                  style={{ width: 80, padding: "6px 10px", fontSize: 13 }}
+                                  placeholder="gram"
+                                  value={grams}
+                                  onChange={(e) => setGrams(y.id, e.target.value)}
+                                />
+                                <span style={{ fontSize: 12, color: "var(--walnut-soft)", whiteSpace: "nowrap" }}>g brukt</span>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="form-field">
+                <label htmlFor="pnotater">Notater</label>
+                <textarea id="pnotater" className="input" value={form.notater} onChange={(e) => update("notater", e.target.value)} placeholder="Fremgang, justeringer, ting å huske på…" />
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="form-field">
+                <label>Bilder av prosjektet</label>
+                <div className="image-upload" onClick={() => fileInputRef.current?.click()}>
+                  📷 Trykk for å laste opp bilde(r) — maks 6
+                </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="visually-hidden"
+                  onChange={(e) => { if (e.target.files.length) handleFiles(e.target.files); e.target.value = ""; }}
+                />
+                {form.bilder && form.bilder.length > 0 && (
+                  <div className="image-preview-row">
+                    {form.bilder.map((src, i) => (
+                      <div className="image-preview-wrap" key={i}>
+                        <img className="image-preview" src={src} alt={`Bilde ${i + 1}`} />
+                        <button type="button" className="image-preview-remove" onClick={() => removeImage(i)} aria-label="Fjern bilde">×</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+          <div className="modal-footer">
+            <button type="button" className="btn btn-outline" onClick={onClose}>Avbryt</button>
+            <button type="submit" className="btn">Lagre prosjekt</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function ProjectDetailModal({ project, yarns, onClose, onEdit, onDelete }) {
+  const [activeImg, setActiveImg] = useState(0);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const garnBruk = project.garnBruk || {};
+  const linkedYarnIds = project.garnIds || Object.keys(garnBruk);
+  const linkedYarns = yarns.filter((y) => linkedYarnIds.includes(y.id));
+
+  function statusClass(status) {
+    if (status === "Ferdig") return "ferdig";
+    if (status === "Pågår") return "pagaar";
+    return "planlagt";
+  }
+
+  return (
+    <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="modal" role="dialog" aria-modal="true" aria-labelledby="project-detail-title" style={{ maxWidth: 680 }}>
+        <div className="modal-header">
+          <h2 id="project-detail-title">{project.navn}</h2>
+          <button className="modal-close" onClick={onClose} aria-label="Lukk">×</button>
+        </div>
+        <div className="modal-body">
+          <div className="detail-grid">
+            <div className="detail-images">
+              {project.bilder && project.bilder.length > 0 ? (
+                <>
+                  <img className="detail-img-main" src={project.bilder[activeImg]} alt={project.navn} />
+                  {project.bilder.length > 1 && (
+                    <div className="detail-thumbs">
+                      {project.bilder.map((src, i) => (
+                        <img key={i} className={`detail-thumb ${i === activeImg ? "active" : ""}`} src={src} alt={`Bilde ${i + 1}`} onClick={() => setActiveImg(i)} />
+                      ))}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="detail-img-main" style={{ display: "flex", alignItems: "center", justifyContent: "center", fontSize: 40 }}>🧣</div>
+              )}
+            </div>
+            <div>
+              <span className={`status-badge ${statusClass(project.status)}`} style={{ marginBottom: 10, display: "inline-block" }}>{project.status}</span>
+              <div className="detail-field-grid">
+                <div className="detail-field"><span className="label">Type</span><span className="value">{project.type || "—"}</span></div>
+                <div className="detail-field"><span className="label">Pinnestørrelse</span><span className="value">{project.pinneStorrelse ? `${project.pinneStorrelse} mm` : "—"}</span></div>
+                <div className="detail-field"><span className="label">Oppskrift</span><span className="value">{project.oppskrift || "—"}</span></div>
+                <div className="detail-field"><span className="label">Startet</span><span className="value">{project.startdato || "—"}</span></div>
+                <div className="detail-field"><span className="label">Ferdig</span><span className="value">{project.sluttdato || "—"}</span></div>
+              </div>
+
+              {linkedYarns.length > 0 && (
+                <div className="detail-field" style={{ marginBottom: 14 }}>
+                  <span className="label">Garn brukt</span>
+                  <div style={{ marginTop: 6, display: "flex", flexDirection: "column", gap: 6 }}>
+                    {linkedYarns.map((y) => {
+                      const gramsUsed = Number(garnBruk[y.id]) || 0;
+                      return (
+                        <div key={y.id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
+                          <span className="swatch" style={{ background: y.fargekode || "#C9AF97" }} />
+                          <span style={{ color: "var(--walnut)", fontWeight: 500 }}>{y.navn}</span>
+                          {gramsUsed > 0 && (
+                            <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--walnut-soft)", background: "var(--cream-deep)", padding: "2px 8px", borderRadius: 100, border: "1px solid var(--taupe-line)" }}>
+                              {gramsUsed} g brukt
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {project.notater && (
+                <div className="detail-field">
+                  <span className="label">Notater</span>
+                  <div className="notes-block">{project.notater}</div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+        <div className="modal-footer" style={{ justifyContent: "space-between" }}>
+          {confirmDelete ? (
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <span style={{ fontSize: 13, color: "var(--walnut-soft)" }}>Slette dette prosjektet?</span>
+              <button className="btn btn-danger btn-sm" onClick={onDelete}>Ja, slett</button>
+              <button className="btn btn-outline btn-sm" onClick={() => setConfirmDelete(false)}>Avbryt</button>
+            </div>
+          ) : (
+            <button className="btn btn-danger btn-sm" onClick={() => setConfirmDelete(true)}>Slett prosjekt</button>
+          )}
+          <button className="btn btn-outline" onClick={onEdit}>Rediger</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   KALKULATOR — yarn substitution & gauge calculators
+   ============================================================ */
+
+function CalculatorView() {
+  return (
+    <div>
+      <div className="view-header">
+        <div>
+          <h1 className="view-title">Kalkulator</h1>
+          <p className="view-desc">
+            Regnehjelp for å bytte ut garn i en oppskrift, kombinere flere tråder, skalere maskeantall etter strikkefasthet, og finne riktig maskeantall fra egne mål.
+          </p>
+        </div>
+      </div>
+
+      <YarnSubstitutionCalc />
+      <GaugeScaleCalc />
+      <BodyMeasureCalc />
+      <CombineThreadsCalc />
+    </div>
+  );
+}
+
+/* ---- 1. Bytte garn: meter mot meter ---- */
+function YarnSubstitutionCalc() {
+  const [oppskriftVekt, setOppskriftVekt] = useState("50");
+  const [oppskriftMeter, setOppskriftMeter] = useState("170");
+  const [oppskriftNoster, setOppskriftNoster] = useState("6");
+  const [nyttVekt, setNyttVekt] = useState("50");
+  const [nyttMeter, setNyttMeter] = useState("150");
+
+  const totalMeterOppskrift = (Number(oppskriftMeter) / Number(oppskriftVekt || 1)) * Number(oppskriftVekt) * Number(oppskriftNoster);
+  // simplifies to oppskriftMeter * oppskriftNoster, but keep formula explicit per handbook style
+  const totalMeter = Number(oppskriftMeter) * Number(oppskriftNoster);
+  const nyeNosterRaw = nyttMeter ? totalMeter / Number(nyttMeter) : 0;
+  const nyeNosterAvrundet = Math.ceil(nyeNosterRaw);
+
+  const valid = oppskriftMeter && oppskriftNoster && nyttMeter && Number(nyttMeter) > 0;
+
+  return (
+    <div className="calc-card">
+      <h3>Bytte garn — meter mot meter</h3>
+      <p className="calc-desc">
+        Oppskriften ber om et bestemt antall nøster av et garn, men du har et annet garn med en annen løpelengde. Regn ut hvor mange nøster av <i>ditt</i> garn du trenger for å få like mange meter totalt.
+      </p>
+      <div className="form-row">
+        <div className="form-field">
+          <label>Oppskriftens garn: m / 50 g</label>
+          <input className="input" type="number" min="0" value={oppskriftMeter} onChange={(e) => setOppskriftMeter(e.target.value)} />
+        </div>
+        <div className="form-field">
+          <label>Antall nøster i oppskriften</label>
+          <input className="input" type="number" min="0" value={oppskriftNoster} onChange={(e) => setOppskriftNoster(e.target.value)} />
+        </div>
+        <div className="form-field">
+          <label>Ditt garn: m / 50 g</label>
+          <input className="input" type="number" min="0" value={nyttMeter} onChange={(e) => setNyttMeter(e.target.value)} />
+        </div>
+      </div>
+      {valid && (
+        <div className="calc-result">
+          Oppskriften krever totalt <b>{totalMeter}</b> meter garn.<br />
+          <div style={{ marginTop: 8 }}>
+            <span className="big">{nyeNosterAvrundet}</span> nøster av ditt garn (50 g = {nyttMeter} m)
+          </div>
+          <div style={{ marginTop: 4, fontSize: 12, color: "var(--walnut-soft)" }}>
+            ({totalMeter} m ÷ {nyttMeter} m = {nyeNosterRaw.toFixed(2)} → rundes opp til {nyeNosterAvrundet})
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---- 2. Skalere strikkefasthet/maskeantall ---- */
+function GaugeScaleCalc() {
+  const [oppskriftFasthet, setOppskriftFasthet] = useState("20");
+  const [dinFasthet, setDinFasthet] = useState("22");
+  const [maskeantall, setMaskeantall] = useState("120");
+  const [omganger, setOmganger] = useState("60");
+
+  const fastOpp = Number(oppskriftFasthet);
+  const fastDin = Number(dinFasthet);
+  const skalafaktor = fastOpp > 0 ? fastDin / fastOpp : 0;
+  const nyeMasker = maskeantall ? Math.round(skalafaktor * Number(maskeantall)) : null;
+  const nyeOmganger = omganger ? Math.round(skalafaktor * Number(omganger)) : null;
+
+  const valid = fastOpp > 0 && fastDin > 0;
+
+  return (
+    <div className="calc-card">
+      <h3>Skalere maskeantall etter strikkefasthet</h3>
+      <p className="calc-desc">
+        Hvis din strikkefasthet (masker per 10 cm) avviker fra oppskriftens, kan du regne ut skalafaktoren og bruke den til å justere antall masker eller omganger i oppskriften.
+      </p>
+      <div className="form-row">
+        <div className="form-field">
+          <label>Oppskriftens strikkefasthet (m/10 cm)</label>
+          <input className="input" type="number" min="0" value={oppskriftFasthet} onChange={(e) => setOppskriftFasthet(e.target.value)} />
+        </div>
+        <div className="form-field">
+          <label>Din strikkefasthet (m/10 cm)</label>
+          <input className="input" type="number" min="0" value={dinFasthet} onChange={(e) => setDinFasthet(e.target.value)} />
+        </div>
+      </div>
+      <div className="form-row">
+        <div className="form-field">
+          <label>Maskeantall i oppskriften (valgfritt)</label>
+          <input className="input" type="number" min="0" value={maskeantall} onChange={(e) => setMaskeantall(e.target.value)} />
+        </div>
+        <div className="form-field">
+          <label>Antall omganger i oppskriften (valgfritt)</label>
+          <input className="input" type="number" min="0" value={omganger} onChange={(e) => setOmganger(e.target.value)} />
+        </div>
+      </div>
+      {valid && (
+        <div className="calc-result">
+          Skalafaktor: <b className="big" style={{ fontSize: 20 }}>{skalafaktor.toFixed(2)}</b>
+          <div style={{ marginTop: 8, display: "flex", gap: 24, flexWrap: "wrap" }}>
+            {nyeMasker !== null && (
+              <div>
+                <div style={{ fontSize: 11, textTransform: "uppercase", color: "var(--walnut-soft)", letterSpacing: "0.05em" }}>Nytt maskeantall</div>
+                <div className="big">{nyeMasker}</div>
+              </div>
+            )}
+            {nyeOmganger !== null && (
+              <div>
+                <div style={{ fontSize: 11, textTransform: "uppercase", color: "var(--walnut-soft)", letterSpacing: "0.05em" }}>Nye omganger</div>
+                <div className="big">{nyeOmganger}</div>
+              </div>
+            )}
+          </div>
+          <div style={{ marginTop: 8, fontSize: 12, color: "var(--walnut-soft)" }}>
+            Husk: justering opp til ~10% kan du ofte ta med pinnestørrelse i stedet. Større avvik krever skalering av maskeantallet — og om mønsteret har en rapport, må sluttresultatet være delelig med rapportens maskeantall.
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---- 3. Finn maskeantall fra mål og garn ---- */
+function BodyMeasureCalc() {
+  const [omkrets, setOmkrets] = useState("100");
+  const [bevegelse, setBevegelse] = useState("8");
+  const [fasthet, setFasthet] = useState("18");
+  const [rapport, setRapport] = useState("");
+
+  const totalOmkrets = Number(omkrets) + Number(bevegelse || 0);
+  const masker = fasthet ? (Number(fasthet) * totalOmkrets) / 10 : 0;
+  const maskerAvrundet = Math.round(masker);
+  let maskerJustert = maskerAvrundet;
+  if (rapport && Number(rapport) > 0) {
+    const rap = Number(rapport);
+    maskerJustert = Math.round(maskerAvrundet / rap) * rap;
+  }
+
+  const valid = omkrets && fasthet;
+
+  return (
+    <div className="calc-card">
+      <h3>Finn maskeantall fra mål</h3>
+      <p className="calc-desc">
+        Mål kroppen (f.eks. brystvidde eller hofteomkrets), legg til bevegelsesvidde (5–10 cm er vanlig), og finn hvor mange masker du må legge opp basert på din strikkefasthet. Hvis mønsteret ditt har en rapport, kan du runde av til nærmeste multiplum.
+      </p>
+      <div className="form-row">
+        <div className="form-field">
+          <label>Kroppsmål (cm)</label>
+          <input className="input" type="number" min="0" value={omkrets} onChange={(e) => setOmkrets(e.target.value)} />
+        </div>
+        <div className="form-field">
+          <label>Bevegelsesvidde (cm)</label>
+          <input className="input" type="number" min="0" value={bevegelse} onChange={(e) => setBevegelse(e.target.value)} />
+        </div>
+        <div className="form-field">
+          <label>Din strikkefasthet (m/10 cm)</label>
+          <input className="input" type="number" min="0" value={fasthet} onChange={(e) => setFasthet(e.target.value)} />
+        </div>
+        <div className="form-field">
+          <label>Mønsterrapport (masker, valgfritt)</label>
+          <input className="input" type="number" min="0" value={rapport} onChange={(e) => setRapport(e.target.value)} />
+        </div>
+      </div>
+      {valid && (
+        <div className="calc-result">
+          Totalt mål inkl. bevegelsesvidde: <b>{totalOmkrets} cm</b>
+          <div style={{ marginTop: 8 }}>
+            <span className="big">{maskerAvrundet}</span> masker
+            {rapport && Number(rapport) > 0 && maskerJustert !== maskerAvrundet && (
+              <> → justert til <b className="big" style={{ fontSize: 20 }}>{maskerJustert}</b> masker for å passe rapporten på {rapport}</>
+            )}
+          </div>
+          <div style={{ marginTop: 4, fontSize: 12, color: "var(--walnut-soft)" }}>
+            ({fasthet} m/10 cm × {totalOmkrets} cm ÷ 10 = {masker.toFixed(1)})
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---- 4. Kombinere flere tråder ---- */
+function CombineThreadsCalc() {
+  const garngruppeOptions = Object.entries(GARNGRUPPER);
+  const [trad1Gruppe, setTrad1Gruppe] = useState("A");
+  const [antallTrader, setAntallTrader] = useState("2");
+
+  // approximate mapping based on handbook: combining N threads of group X gives roughly group at index+steps
+  const groupOrder = ["A", "AB", "B", "C", "D", "E", "F"];
+  const stepsForThreads = { "2": 2, "3": 3, "4": 4, "8": 5 }; // rough heuristic; A+A=C (2 steps), A 3x = D, etc.
+
+  const startIdx = groupOrder.indexOf(trad1Gruppe);
+  const steps = stepsForThreads[antallTrader] || 2;
+  const resultIdx = Math.min(groupOrder.length - 1, startIdx + Math.round(steps * 0.6));
+  const resultGroup = groupOrder[resultIdx];
+
+  return (
+    <div className="calc-card">
+      <h3>Kombinere flere tråder</h3>
+      <p className="calc-desc">
+        Strikker du med flere tråder samtidig (holde to eller flere nøster sammen), blir resultatet en tykkere "garngruppe". Dette er en grov pekepinn — test alltid med en prøvelapp, siden resultatet varierer med fibertype og spinning.
+      </p>
+      <div className="form-row">
+        <div className="form-field">
+          <label>Garngruppe du starter med</label>
+          <select className="select" value={trad1Gruppe} onChange={(e) => setTrad1Gruppe(e.target.value)}>
+            {garngruppeOptions.map(([k, g]) => <option key={k} value={k}>{k} — {g.navn}</option>)}
+          </select>
+        </div>
+        <div className="form-field">
+          <label>Antall tråder holdt sammen</label>
+          <select className="select" value={antallTrader} onChange={(e) => setAntallTrader(e.target.value)}>
+            <option value="2">2 tråder</option>
+            <option value="3">3 tråder</option>
+            <option value="4">4 tråder</option>
+            <option value="8">8 tråder</option>
+          </select>
+        </div>
+      </div>
+      <div className="calc-result">
+        {antallTrader} tråder av garngruppe <b>{trad1Gruppe}</b> gir omtrent garngruppe{" "}
+        <span className="big">{resultGroup}</span> ({GARNGRUPPER[resultGroup].navn})
+        <div style={{ marginTop: 8, fontSize: 12, color: "var(--walnut-soft)" }}>
+          Tommelfingerregler fra håndboken: 2 tråder A = 1 tråd C · 3 tråder A = 1 tråd D · 4 tråder A = 1 tråd E · 8 tråder A = 1 tråd F · 2 tråder B = 1 tråd D · 2 tråder C = 1 tråd E · 4 tråder C = 1 tråd F · 2 tråder E = 1 tråd F.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   HÅNDBOK — fiber guide, garngrupper, fargelære, oppbevaring
+   Basert på "En håndbok om Garn" av Annette Fostås Degvold,
+   omarbeidet og strukturert.
+   ============================================================ */
+
+const HANDBOOK_SECTIONS = [
+  { id: "intro", title: "Hvorfor en garnhåndbok" },
+  { id: "animalske", title: "Animalske fibre" },
+  { id: "plante", title: "Plantebaserte fibre" },
+  { id: "syntetiske", title: "Syntetiske fibre" },
+  { id: "identifisere", title: "Usikker på fibertype?" },
+  { id: "kombinere", title: "Kombinere fibertyper" },
+  { id: "garngrupper", title: "Garngrupper og pinner" },
+  { id: "farge", title: "Farge og fargelære" },
+  { id: "organisering", title: "Organisere restegarn" },
+  { id: "mengde", title: "Beregne mengde garn" },
+  { id: "skalering", title: "Skalere maskeantall" },
+  { id: "teknikker", title: "Grunnteknikker" },
+  { id: "prosjekter", title: "Prosjektideer for restegarn" },
+];
+
+function HandbookView() {
+  const [active, setActive] = useState("intro");
+  const refs = useRef({});
+
+  function scrollTo(id) {
+    setActive(id);
+    refs.current[id]?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  return (
+    <div>
+      <div className="view-header">
+        <div>
+          <h1 className="view-title">Håndbok om garn</h1>
+          <p className="view-desc">
+            Et oppslagsverk over fibertyper, garngrupper, fargelære og utregninger — til hjelp når du skal velge garn, bytte ut garn i en oppskrift, eller designe egne prosjekter med restegarn.
+          </p>
+        </div>
+      </div>
+
+      <div className="handbook-layout">
+        <nav className="handbook-toc" aria-label="Innhold i håndboken">
+          {HANDBOOK_SECTIONS.map((s) => (
+            <button key={s.id} className={`handbook-toc-item ${active === s.id ? "active" : ""}`} onClick={() => scrollTo(s.id)}>
+              {s.title}
+            </button>
+          ))}
+        </nav>
+
+        <div className="handbook-content">
+          <section id="intro" ref={(el) => (refs.current["intro"] = el)}>
+            <h2>🧶 Hvorfor en garnhåndbok</h2>
+            <p>
+              Garn er kostbart, og det er sløsing å la nøster og rester ligge ubrukt i kurven. Restegarn er ikke bare et miljøvennlig og økonomisk valg — det gir også mulighet til å lære nye teknikker, bli tryggere på fargekombinasjoner og finne ut hva ulike fibertyper egentlig er gode til.
+            </p>
+            <p>
+              Denne håndboken er et oppslagsverk: bruk den til å finne garn som fungerer sammen, finne riktig utregningsmetode for å bruke opp garn du har liggende, og bli tryggere på valgene du tar i strikkereisen.
+            </p>
+            <div className="callout">
+              <b>Tips</b> — et lett sommerplagg trenger ikke nødvendigvis mohair sin isolerende varme, og et tykt vinterplagg bør heller vurdere garn av merinoull enn et tynt syntetisk garn. Velg fiber etter hva plagget skal brukes til, ikke bare etter hva som er tilgjengelig.
+            </div>
+          </section>
+
+          <section id="animalske" ref={(el) => (refs.current["animalske"] = el)}>
+            <h2>🐑 Animalske fibre</h2>
+            <p>
+              Animalske fibre kommer fra dyr eller insekter. Mange kvier seg for å bruke strikket plagg av ull fordi det klør eller stikker, eller på grunn av allergi — men ull er ikke ull: det finnes allergivennlige varianter, varianter som er silkemyke mot huden, og fibre som passer til de fineste anledningene. Animalske fibre holder ikke på lukt, er ofte selvrensende og svært gode til isolerende plagg.
+            </p>
+
+            <h3>Alpakka</h3>
+            <div className="fiber-row">
+              <img src="https://images.unsplash.com/photo-1589182337358-2cb63099350c?w=300&h=240&fit=crop" alt="Alpakkaer på en gård" />
+              <p style={{ margin: 0 }}>
+                Ull fra alpakka har lik struktur som saueull, men er hele tre ganger så varm. Alpakka har liten fiberdiameter, som gjør garnet mykere enn vanlig ull — luksuriøst og silkeaktig, slitesterkt og mykt. Garnet er ikke lett å tove og nupper lite. Alpakka stikker ikke og inneholder ikke lanolin, så garntypen er allergivennlig og godt likt av mange. Variantene <b>royal alpakka</b> og <b>coarse alpakka</b> finnes, men er mindre vanlige enn alpakkaull og baby alpakka.
+              </p>
+            </div>
+
+            <h3>Baby alpakka</h3>
+            <div className="fiber-row">
+              <img src="https://images.unsplash.com/photo-1554457945-26bd07cc56f6?w=300&h=240&fit=crop" alt="Baby alpakka" />
+              <p style={{ margin: 0 }}>
+                Kommer ikke fra alpakkababyer (cria), men fra de mykeste delene av alpakkaen — de fineste hårstråene. Garnet er enda mykere enn vanlig alpakkagarn, svært lett og behagelig mot huden, og har de samme egenskapene som alpakka.
+              </p>
+            </div>
+
+            <h3>Lama</h3>
+            <div className="fiber-row">
+              <img src="https://images.unsplash.com/photo-1612531822953-8ee8b9b08c89?w=300&h=240&fit=crop" alt="Lamaer" />
+              <p style={{ margin: 0 }}>
+                Noe grovere enn alpakka, men mykere enn vanlig saueull. God isolasjonsevne, sterkt og holdbart, men samtidig lite elastisk. Fibrene kan klø, så tenk gjerne ytterplagg med prosjekter strikket i dette fiberet.
+              </p>
+            </div>
+
+            <h3>Kashmir</h3>
+            <div className="fiber-row">
+              <img src="https://images.unsplash.com/photo-1551884170-09fb70a3a2ed?w=300&h=240&fit=crop" alt="Kashmirgeit" />
+              <p style={{ margin: 0 }}>
+                Kommer fra underullen til en geiteart som holder til i India. Kashmirull er tre ganger så varm som saueull og består av svært tynne fibre — dette gjør kashmir til ett av de mykeste garnene som finnes. Den isolerende egenskapen gjør at garnet egner seg godt til varme plagg som gensere, skjerf og tepper.
+              </p>
+            </div>
+
+            <h3>Mohair</h3>
+            <div className="fiber-row">
+              <img src="https://images.unsplash.com/photo-1547721064-da6cfb341d50?w=300&h=240&fit=crop" alt="Angorageit" />
+              <p style={{ margin: 0 }}>
+                Kommer fra angorageiten og er et luksuriøst fiber. Garnet er fire ganger så varmt som saueull og mye mer luftig. Det er slitesterkt, men vanskelig å tove. Fibrene har en særegen glans og føles lette og luftige — passer derfor godt for skal man sitte rett på huden, men er ofte best som ytterlag eller tilleggstråd.
+              </p>
+            </div>
+
+            <h3>Yak</h3>
+            <div className="fiber-row">
+              <img src="https://images.unsplash.com/photo-1517783999520-f068d7431a60?w=300&h=240&fit=crop" alt="Yak i fjellandskap" />
+              <p style={{ margin: 0 }}>
+                Yaken lever i høyfjellene i Tibet, Mongolia og Sentral-Asia. Ullfibrene samles fra underpelsen og er myke, luftige og lette — så mye som 30–40 % varmere enn saueull. Garnet er godt egnet direkte på huden, men på grunn av at fibertypen er mer eksklusiv, brukes ullen ofte sammen med andre fibre eller til mindre plagg.
+              </p>
+            </div>
+
+            <h3>Angora</h3>
+            <div className="fiber-row">
+              <img src="https://images.unsplash.com/photo-1535241749838-299277b6305f?w=300&h=240&fit=crop" alt="Angorakanin" />
+              <p style={{ margin: 0 }}>
+                Garn merket angora kommer fra angorakaninen — den eneste kaninrasen hvor pelsen hele tiden vokser ut og må klippes. Dette luksuriøse garnet egner seg til mindre prosjekter som skjerf og vanter. Garnet ser puslete ut på pinnen, men vil "fluffe" seg opp etter hvert. Det er derfor anbefalt å strikke med en pinne større enn angitt.
+              </p>
+            </div>
+
+            <h3>Ull</h3>
+            <div className="fiber-row">
+              <img src="https://images.unsplash.com/photo-1484557985045-edf25e08da73?w=300&h=240&fit=crop" alt="Saueflokk" />
+              <p style={{ margin: 0 }}>
+                Saueull har forholdsvis grove fibre, som gjør den ypperlig å tove med. Ullen holder svært godt på varme med gode isolerende egenskaper. På nøster merket "Ren, ny ull" er ullen ikke gjenvunnet. Ull merket "Superwash" er behandlet slik at krøllene i det ytterste laget av fibrene er redusert, og plagget vil ikke toves i vask.
+              </p>
+            </div>
+
+            <h3>Merinoull</h3>
+            <div className="fiber-row">
+              <img src="https://images.unsplash.com/photo-1547036967-23d11aacaee0?w=300&h=240&fit=crop" alt="Merinosau" />
+              <p style={{ margin: 0 }}>
+                Kommer fra merinosauen, som har sin opprinnelse i Spania. I dag er sauearten mest utbredt i New Zealand og Australia. Denne ullen anses som den fineste saueullen — mykere enn norsk ull — og brukes derfor ofte til babytøy og plagg som skal sitte rett på huden.
+              </p>
+            </div>
+
+            <h3>Silke</h3>
+            <div className="fiber-row">
+              <img src="https://images.unsplash.com/photo-1622037022824-0c71f411a3b9?w=300&h=240&fit=crop" alt="Silkekokonger" />
+              <p style={{ margin: 0 }}>
+                Silke er et fint og sammenhengende fiber laget av silkeormer, og er dermed animalsk. Silke er ett av de sterkeste naturfibrene vi har — bare litt mindre slitesterkt enn nylon — og er godt egnet til å bruke sammen med andre fibre for å heve deres egenskaper. Silke holder på varmen, absorberer fuktighet, gir en luksuriøs glans og er svært formstabilt.
+              </p>
+            </div>
+          </section>
+
+          <section id="plante" ref={(el) => (refs.current["plante"] = el)}>
+            <h2>🌿 Plantebaserte fibre</h2>
+            <p>
+              Naturfibre fra planter gir svale, behagelige og luftige plagg. De er stort sett allergivennlige, tåler maskinvask bedre enn animalske fibre, er motstandsdyktige mot slitasje og mindre utsatt for skadedyr som møll. De absorberer fuktighet svært godt, kommer ofte i klare fargesterke nyanser, og oppleves kjølende i varme temperaturer.
+            </p>
+
+            <h3>Lin</h3>
+            <div className="fiber-row">
+              <img src="https://images.unsplash.com/photo-1530482854-1df8ee31c7a4?w=300&h=240&fit=crop" alt="Linplante med blomster" />
+              <p style={{ margin: 0 }}>
+                Produseres av stilken til linplanten og er et slitesterkt fiber med svært lang levetid. Lin i seg selv er forholdsvis stivt og grovt, så det kombineres ofte med viskose eller andre fibertyper. Lin har en fantastisk temperaturregulerende egenskap — den holder godt på varmen, men føles luftig og sval på varme dager. I tillegg er lin motstandsdyktig mot UV-stråling og beskytter huden mot solens sterke stråling.
+              </p>
+            </div>
+
+            <h3>Bomull</h3>
+            <div className="fiber-row">
+              <img src="https://images.unsplash.com/photo-1622383563227-04401ab4e5ea?w=300&h=240&fit=crop" alt="Bomullsplante" />
+              <p style={{ margin: 0 }}>
+                Et mykt og luftig tekstil som egner seg godt til lette sommerplagg og tilbehør. Bomull er svakere enn silke og lin, men sterkere enn ull. <b>Mercerisert bomull</b> har vært gjennom en behandling som gir garnet mer glans, tar til seg fargestoffer bedre, og gjør garnet sterkere og mer motstandsdyktig mot meldugg. Mercerisert bomull loer ikke like mye, og vil ikke krympe eller miste formen slik vanlig bomull kan.
+              </p>
+            </div>
+
+            <h3>Viskose</h3>
+            <p>
+              Til tross for at viskose er laget av trefibre, er det ikke et rent naturprodukt — det er grunnet sin kjemiske og syntetiske behandling. Viskose kommer i to ulike typer: <b>langfibrede</b> og <b>kortfibrede</b> produkter. De langfibrede produktene gir glatte, silkeaktige plagg, mens kortfibret viskose gir mer ullaktige plagg med grovere tekstur.
+            </p>
+            <table className="htable">
+              <thead><tr><th>Type</th><th>Beskrivelse</th></tr></thead>
+              <tbody>
+                <tr><td>Viskose / Rayon</td><td>Generell trecellulose</td></tr>
+                <tr><td>Modal</td><td>Bøketre</td></tr>
+                <tr><td>Lyocell</td><td>Eukalyptus, bøk og bambus</td></tr>
+              </tbody>
+            </table>
+
+            <h3>Bambus</h3>
+            <div className="fiber-row">
+              <img src="https://images.unsplash.com/photo-1583089892943-e02e5b127a13?w=300&h=240&fit=crop" alt="Bambus" />
+              <p style={{ margin: 0 }}>
+                Veldig mykt og behagelig mot huden. Garn laget av bambus er faktisk en type viskose, men utelukkende laget av bambus. Garnet er antibakterielt og godt egnet for personer med allergi og sensitiv hud. Bambus kombineres ofte med andre fibertyper, ettersom bambus for seg selv kan være noe svakt — det sige i fasongen etter som fiberet er forholdsvis tungt, og har liten elastisitet.
+              </p>
+            </div>
+          </section>
+
+          <section id="syntetiske" ref={(el) => (refs.current["syntetiske"] = el)}>
+            <h2>⚗️ Syntetiske fibre</h2>
+            <p>
+              Akryl, nylon (polyamid) og polyester brukes ofte i kombinasjon med andre fibre for å gi et sterkere og mer slitesterkt garn, eller for å skape andre strukturer i garnet. Garn laget av rene syntetiske fibre kan oppleves klamt, puster dårlig og blir spesielt statisk om vinteren. Det er derfor å anbefale å bruke syntetiske fibre i kombinasjon med naturfibre for å styrke naturfibrenes egenskaper.
+            </p>
+
+            <h3>Akryl</h3>
+            <div className="fiber-row">
+              <img src="https://images.unsplash.com/photo-1591287083773-9f5ea1207a52?w=300&h=240&fit=crop" alt="Fargerikt garn" />
+              <p style={{ margin: 0 }}>
+                Garn laget av akryl likner på ull i utseende og struktur. Garnet er mykt og luftig, varmt og rimelig. Det kan hjelpe tunge fibre med å holde fasongen, øker slitestyrken på plaggene og holder godt på fargen. Samtidig kan plagg med akryl nuppe over tid.
+              </p>
+            </div>
+
+            <h3>Nylon (polyamid)</h3>
+            <div className="fiber-row">
+              <img src="https://images.unsplash.com/photo-1605493725784-56cca0e87f88?w=300&h=240&fit=crop" alt="Garnnøster i mange farger" />
+              <p style={{ margin: 0 }}>
+                Svært elastisk og slitesterkt. Plagg med nylon er formstabile og kan gi økt levetid på andre fibertyper når disse kombineres. Spesielt nyttig å tilføye i plagg som er utsatt for slitasje, som sokker, og plagg som har ekstra behov for stretch.
+              </p>
+            </div>
+
+            <h3>Polyester</h3>
+            <div className="fiber-row">
+              <img src="https://images.unsplash.com/photo-1591213954196-6a6a8a1d4c44?w=300&h=240&fit=crop" alt="Garnnøster i kurv" />
+              <p style={{ margin: 0 }}>
+                Glatt, slitesterkt og fuktavvisende. Tørker raskt, er fargeekte (bleknes lite), bakterieresistent og rimelig. Å tilføre polyester i fibre vil gjøre plaggene mer slitesterke.
+              </p>
+            </div>
+          </section>
+
+          <section id="identifisere" ref={(el) => (refs.current["identifisere"] = el)}>
+            <h2>🔍 Usikker på fibertype?</h2>
+            <p>
+              Det kan fort skje at man mister banderollen til garnet, og da er det ikke like enkelt å vite hva man sitter med. Det finnes noen metoder for å forsøke å identifisere fibertypen — men ettersom mange garn inneholder mer enn én fibertype, kan dette være upresist. Likevel kan det gi en indikasjon.
+            </p>
+            <h3>Kjenne og se på garnet</h3>
+            <table className="htable">
+              <thead><tr><th>Fibertype</th><th>Kjennetegn</th></tr></thead>
+              <tbody>
+                <tr><td>Ull</td><td>Elastisk, matt, gir varme og har spenst i seg</td></tr>
+                <tr><td>Bomull</td><td>Fast, glatt, matt, tett spunnet med lite elasitet</td></tr>
+                <tr><td>Syntetisk</td><td>Mykt, glatt, kan være litt stivt, føles plastaktig</td></tr>
+                <tr><td>Alpakka</td><td>Silkeaktig, loddent, glansfullt og mykt</td></tr>
+                <tr><td>Mohair</td><td>Loddent, pusete, skinnende, veldig lett og luftig</td></tr>
+                <tr><td>Silke</td><td>Glatt og kjølig, sterk glans, ofte i blandingsgarn</td></tr>
+                <tr><td>Viskose</td><td>Kjølig, glatt, glansfullt, noe tyngde i garnet</td></tr>
+              </tbody>
+            </table>
+
+            <div className="callout warn">
+              <b>Brennetest</b> — kan gi en indikasjon, men gjør dette i trygge omgivelser: hold fibrene med en pinsett, sørg for god ventilasjon og ha gjerne en kjele med lokk eller branntepper tilgjengelig.
+            </div>
+            <table className="htable">
+              <thead><tr><th>Fibertype</th><th>Brenner</th><th>Lukt</th><th>Etterlater</th></tr></thead>
+              <tbody>
+                <tr><td>Animalske fibre</td><td>Sakte, kan slukke på egenhånd</td><td>Som brennende hår</td><td>Svart, sprø kule</td></tr>
+                <tr><td>Bomull og lin</td><td>Lett</td><td>Som brennende papir</td><td>Grå, myk aske</td></tr>
+                <tr><td>Silke</td><td>Sakte, mildere enn andre animalske fibre</td><td>Brent hår-lukt</td><td>Sprø aske</td></tr>
+                <tr><td>Syntetisk</td><td>Smelter og brenner</td><td>Svidd plast</td><td>Hard plastkule</td></tr>
+                <tr><td>Viskose</td><td>Jevnt</td><td>Brent papir med noe sødme</td><td>Lys, fin aske</td></tr>
+              </tbody>
+            </table>
+          </section>
+
+          <section id="kombinere" ref={(el) => (refs.current["kombinere"] = el)}>
+            <h2>🧩 Kombinere fibertyper</h2>
+            <p>
+              For å forstå hvordan plagget vil oppføre seg ved kombinasjon av ulike garn- og fibertyper, er det alltid lurt å strikke en prøvelapp. Det er også viktig å ta hensyn til hva man ønsker å oppnå med plagget man skal strikke, og hensynet til det mest ømfintlige fiberet når man skal vaske plagget.
+            </p>
+            <p>
+              Kombinerer man for eksempel ull med silke, må man følge vaskeanvisningen til ullen. Ullen kan krympe, mens silken holder seg i fasong — samtidig som ullen til en viss grad kan strekkes ut etter vask, mens silken ikke tåler å strekkes på samme måte.
+            </p>
+            <div className="callout">
+              <b>Husk</b> — kombinasjoner kan gi spennende strukturer, endre egenskapene til garnet og gi helt særegne plagg. Stort sett kan alt av fibre kombineres, så her er det bare å prøve seg frem!
+            </div>
+          </section>
+
+          <section id="garngrupper" ref={(el) => (refs.current["garngrupper"] = el)}>
+            <h2>📏 Garngrupper og pinnestørrelser</h2>
+            <p>
+              Garn deles inn i garngrupper etter tykkelse. Garn i samme garngruppe skal ha lik strikkefasthet, men løpelengden (meter per 50 g) kan variere fra garntype til garntype innad i samme gruppe — du kan derfor ikke regne med at 50 g av ett nøste i en gruppe tilsvarer 50 g av et annet nøste i samme gruppe.
+            </p>
+            <table className="htable">
+              <thead>
+                <tr><th>Gruppe</th><th>Navn</th><th>Strikkefasthet (m/10cm)</th><th>Meter pr. 50 g</th><th>Strikkepinne</th><th>Heklenål</th></tr>
+              </thead>
+              <tbody>
+                {Object.entries(GARNGRUPPER).map(([k, g]) => (
+                  <tr key={k}>
+                    <td><span className={`tag group-${k}`}>{k}</span></td>
+                    <td>{g.navn}</td>
+                    <td>{g.strikkefasthet}</td>
+                    <td>{g.meter}</td>
+                    <td>{g.pinneStrikk}</td>
+                    <td>{g.pinneHekle}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p>
+              Anbefalt pinnestørrelse varierer selv om garnet er i lik garngruppe. Det er derfor viktig å teste strikkefastheten på en prøvelapp — det er ikke siste gang du vil høre dette i denne håndboken!
+            </p>
+
+            <h3>WPI-metoden (Wraps Per Inch)</h3>
+            <p>
+              Vikle garnet jevnt rundt en linjal i én rad uten å stramme. Tell hvor mange ganger garnet får rundt per tomme (2,54 cm). Dette kan gi en indikasjon på garnvekten:
+            </p>
+            <table className="htable">
+              <thead><tr><th>Garngruppe</th><th>WPI</th></tr></thead>
+              <tbody>
+                <tr><td>Lace</td><td>30+ WPI</td></tr>
+                <tr><td>Fingering</td><td>19–22 WPI</td></tr>
+                <tr><td>Sport</td><td>15–18 WPI</td></tr>
+                <tr><td>DK</td><td>12–14 WPI</td></tr>
+                <tr><td>Worsted</td><td>9–11 WPI</td></tr>
+                <tr><td>Bulky</td><td>6–8 WPI</td></tr>
+              </tbody>
+            </table>
+
+            <h3>Kombinere garngrupper med flere tråder</h3>
+            <p>Ut fra strikkefastheten kan man kombinere flere tråder fra ulike garngrupper for å oppnå samme tykkelse som en tykkere garngruppe:</p>
+            <table className="htable">
+              <thead><tr><th>Kombinasjon</th><th>Tilsvarer</th></tr></thead>
+              <tbody>
+                <tr><td>Garngruppe A: 2 tråder</td><td>1 tråd i garngruppe C</td></tr>
+                <tr><td>Garngruppe A: 3 tråder</td><td>1 tråd i garngruppe D</td></tr>
+                <tr><td>Garngruppe A: 4 tråder</td><td>1 tråd i garngruppe E</td></tr>
+                <tr><td>Garngruppe A: 8 tråder</td><td>1 tråd i garngruppe F</td></tr>
+                <tr><td>Garngruppe B: 2 tråder</td><td>1 tråd i garngruppe D</td></tr>
+                <tr><td>Garngruppe C: 2 tråder</td><td>1 tråd i garngruppe E</td></tr>
+                <tr><td>Garngruppe C: 4 tråder</td><td>1 tråd i garngruppe F</td></tr>
+                <tr><td>Garngruppe E: 2 tråder</td><td>1 tråd i garngruppe F</td></tr>
+              </tbody>
+            </table>
+            <p style={{ fontFamily: "var(--font-mono)", fontSize: 13, textAlign: "center" }}>I DROPS sine oppskrifter skrives dette f.eks. slik: A + A = C</p>
+          </section>
+
+          <section id="farge" ref={(el) => (refs.current["farge"] = el)}>
+            <h2>🎨 Farge og fargelære</h2>
+            <h3>Sortere etter farge</h3>
+            <p>
+              Farger som går ton-i-ton er ofte enkle å kombinere for å få et delikat og rolig uttrykk. Man kan også leke seg med kontraster for å skape mer spennende og lekne mønstre. For et harmonisk uttrykk kan det være greit å holde seg til tre farger — en grunnfarge og inntil tre mønsterfarger.
+            </p>
+            <p>
+              Et tips er å sortere varme og kalde farger hver for seg, og bruke farger i lik temperaturskala i prosjektene dine. Tenk også på mengdemetning — altså hvor fargesterk fargen er. Å bruke en dus rosatone sammen med en "hot pink" kan gjøre at den duse rosafargen forsvinner i det totale uttrykket, men det kan også skape en stilig effekt. Hvis man bruker komplementærfarger (kontrastfarger) vil plagget få et spennende og livlig uttrykk.
+            </p>
+
+            <h3>Ittens fargesirkel</h3>
+            <p>
+              Ittens fargesirkel viser de ulike komplementærfargene med de tre grunnfargene gul, rød og blå som utgangspunkt. Komplementærfarger skaper store kontraster, mens nabofarger skaper mer harmoni.
+            </p>
+
+            <h3>Kulør, metning og valør</h3>
+            <p>
+              <b>Kulør</b> er hvilken farge det er snakk om (blå, gul, oransje). <b>Metning</b> er hvor fargesterk fargen er — ytterst er fargen mest fargesterk og inneholder lite sort eller hvitt, mens innerst er fargen tilsatt sort eller hvitt, som gjør fargen mer dempet. <b>Valør</b> forteller hvor på skalaen fargen hører hjemme, fra mørk til lys. Farger som er i samme rad vertikalt eller horisontalt vil harmonere med hverandre.
+            </p>
+
+            <h3>Praktiske kombinasjoner</h3>
+            <p>
+              Komplementærfarger (kontrastfarger), varme/kalde kombinasjoner, og høy/lav metning eller valør er alle måter å bevisst styre uttrykket på et prosjekt. Tips: prøv å legge garnnøstene dine fysisk side om side i ulikt dagslys før du bestemmer deg — fargeoppfatningen endrer seg mye med lyset.
+            </p>
+          </section>
+
+          <section id="organisering" ref={(el) => (refs.current["organisering"] = el)}>
+            <h2>📦 Organisere restegarn</h2>
+            <p>
+              Før du kan sette i gang med et restegarnprosjekt er det lurt å få en oversikt over hva du faktisk har. Måter man kan gjøre det på er å enten sortere etter garnvekt, fibertype (ull, lin, bomull, akryl og liknende) eller farger som harmonerer med hverandre — som denne appen hjelper deg med.
+            </p>
+
+            <h3>Banderollen / merkelappen mangler</h3>
+            <p>
+              Det er ikke sjeldent at banderollen mangler. Ofte forsvinner den når man har tatt litt av nøstet, eller hvis man har rukket opp og surret opp garnet igjen. Da er det verken lett å finne ut hva slags type garn man har eller hvilken strikkefasthet som er riktig.
+            </p>
+
+            <h3>Veie opp garnet</h3>
+            <p>
+              Du kan veie opp garnet for hånd ved å måle opp noen meter og se hva det veier. Dette kan gi deg en indikasjon på hvilken garngruppe garnet tilhører. Noen eksempler på garntyper:
+            </p>
+            <table className="htable">
+              <thead><tr><th>Eksempel</th><th>Garntype</th><th>Garngruppe</th><th>Løpelengde</th></tr></thead>
+              <tbody>
+                <tr><td>A</td><td>Drops Lace</td><td><span className="tag group-A">A · Lace</span></td><td>50 g = 400 m</td></tr>
+                <tr><td>B</td><td>Filcolana Arwetta</td><td><span className="tag group-AB">AB · Fingering</span></td><td>50 g = 210 m</td></tr>
+                <tr><td>C</td><td>Sandnes Duo</td><td><span className="tag group-B">B · Sport</span></td><td>50 g = 124 m</td></tr>
+                <tr><td>D</td><td>Sandnes Merino Ull</td><td><span className="tag group-C">C · DK</span></td><td>50 g = 105 m</td></tr>
+                <tr><td>E</td><td>Drops Nepal</td><td><span className="tag group-D">D · Worsted</span></td><td>50 g = 82 m</td></tr>
+                <tr><td>F</td><td>Rowan Big Wool</td><td><span className="tag group-F">F · Super bulky</span></td><td>50 g = 40 m</td></tr>
+              </tbody>
+            </table>
+            <p>
+              Bokstavene her tilsvarer en garngruppe — garn i samme garngruppe skal ha lik strikkefasthet, men løpelengden kan variere fra garntype til garntype, så du kan ikke regne med at 50 g av ett nøste tilsvarer 50 g av et annet nøste i samme gruppe.
+            </p>
+          </section>
+
+          <section id="mengde" ref={(el) => (refs.current["mengde"] = el)}>
+            <h2>🧮 Beregne mengde garn</h2>
+            <p>
+              Når du har funnet et prosjekt du vil bruke restegarn til, men garnet ditt ikke samsvarer med oppskriften (annen strikkefasthet, annen løpelengde per 50 g, eller annen pinne enn anbefalt) — bruk Kalkulator-fanen til å regne ut nøyaktig hvor mye garn du trenger. Tre eksempler fra håndboken viser prinsippet:
+            </p>
+
+            <h3>Eksempel 1 — tråd mot tråd</h3>
+            <p>
+              Oppskriften sier garn på 50 g = 170 meter, og det benyttes 6 nøster. Du har garn hvor 50 g = 150 m. Totalt antall meter i oppskriften er 6 × 170 = 1020 meter. Del dette på meter per 50 g for ditt garn:
+            </p>
+            <p style={{ fontFamily: "var(--font-mono)", textAlign: "center" }}>1020 ÷ 150 = 6,8 → du trenger 7 nøster av ditt garn (50 g = 150 m).</p>
+
+            <h3>Eksempel 2 — 1 tråd mot 2 tråder</h3>
+            <p>
+              Oppskriften sier totalt 1150 g garn, hvor opprinnelig garn er 50 g = 50 meter. Det gir 1150 ÷ 50 = 23 nøster. Hvis ditt nye garn er 50 g = 150 meter, gir 1150 ÷ 150 = 7,67 — du behøver i dette tilfellet kun 8 nøster i stedet for 23.
+            </p>
+
+            <h3>Eksempel 3 — to tråder med ulik løpelengde til én</h3>
+            <p>
+              Oppskriften sier 300 g av garn X (50 g = 167 m) + 125 g av garn Y (50 g = 400 m). Det gir 6 nøster av garn X (1002 m totalt) og 2,5 nøster av garn Y (1000 m totalt). Hvis ønsket garn er 50 g = 150 m, ta utgangspunkt i garnet med kortest løpelengde totalt (her garn Y, 1000 m). Del 1000 på 50: 1000 ÷ 150 ≈ 6,7 → ca. 7 nøster (350 g) av det nye garnet.
+            </p>
+
+            <h3>Mengde for vanlige prosjekter</h3>
+            <p>Omtrentlig mengde garn for ulike prosjekter — kun veiledende, da avvik avhenger av garntype, tykkelse og strikkefasthet:</p>
+            <table className="htable">
+              <thead><tr><th>Plagg</th><th>Størrelse</th><th>Ca. meter</th></tr></thead>
+              <tbody>
+                <tr><td>Lue</td><td>Baby</td><td>50–80 m</td></tr>
+                <tr><td>Lue</td><td>Barn</td><td>80–120 m</td></tr>
+                <tr><td>Lue</td><td>Voksen</td><td>120–180 m</td></tr>
+                <tr><td>Votter</td><td>Barn</td><td>60–100 m</td></tr>
+                <tr><td>Votter</td><td>Voksen</td><td>100–160 m</td></tr>
+                <tr><td>Skjerf</td><td>Barn</td><td>150–300 m</td></tr>
+                <tr><td>Skjerf</td><td>Voksen, kort</td><td>300–500 m</td></tr>
+                <tr><td>Skjerf</td><td>Voksen, lang</td><td>500–800 m</td></tr>
+                <tr><td>Sokker</td><td>Baby</td><td>50–70 m</td></tr>
+                <tr><td>Sokker</td><td>Barn</td><td>70–100 m</td></tr>
+                <tr><td>Sokker</td><td>Voksen, kort skaft</td><td>250–350 m</td></tr>
+                <tr><td>Sokker</td><td>Voksen, langt skaft</td><td>350–500 m</td></tr>
+                <tr><td>Teppe</td><td>Baby 75×100</td><td>600–1000 m</td></tr>
+                <tr><td>Teppe</td><td>Lite 100×130</td><td>1000–1500 m</td></tr>
+                <tr><td>Teppe</td><td>Stort 140×200</td><td>2000–3000 m</td></tr>
+                <tr><td>Genser</td><td>Baby 0–3 mnd</td><td>180–250 m</td></tr>
+                <tr><td>Genser</td><td>Baby 6–12 mnd</td><td>250–350 m</td></tr>
+                <tr><td>Genser</td><td>Barn 1–2 år</td><td>350–450 m</td></tr>
+                <tr><td>Genser</td><td>Barn 3–4 år</td><td>400–500 m</td></tr>
+                <tr><td>Genser</td><td>Barn 5–6 år</td><td>450–550 m</td></tr>
+                <tr><td>Genser</td><td>Barn 7–8 år</td><td>500–600 m</td></tr>
+                <tr><td>Genser</td><td>Barn 9–10 år</td><td>600–700 m</td></tr>
+                <tr><td>Genser</td><td>Dame XS</td><td>700–800 m</td></tr>
+                <tr><td>Genser</td><td>Dame S</td><td>800–900 m</td></tr>
+                <tr><td>Genser</td><td>Dame M</td><td>900–1000 m</td></tr>
+                <tr><td>Genser</td><td>Dame L</td><td>1000–1100 m</td></tr>
+                <tr><td>Genser</td><td>Dame XL</td><td>1100–1250 m</td></tr>
+                <tr><td>Genser</td><td>Herre S</td><td>1000–1150 m</td></tr>
+                <tr><td>Genser</td><td>Herre M</td><td>1150–1300 m</td></tr>
+                <tr><td>Genser</td><td>Herre L</td><td>1300–1500 m</td></tr>
+                <tr><td>Genser</td><td>Herre XL</td><td>1500–1700 m</td></tr>
+              </tbody>
+            </table>
+
+            <h3>Mønster og struktur påvirker forbruket</h3>
+            <p>Hvis du tilfører mønster eller struktur i prosjektet, vil dette påvirke antall meter som brukes:</p>
+            <table className="htable">
+              <thead><tr><th>Teknikk</th><th>Endring i garnforbruk</th></tr></thead>
+              <tbody>
+                <tr><td>Ribbestrikk</td><td>5–10 % mer garn</td></tr>
+                <tr><td>Fletter</td><td>10–25 % mer garn</td></tr>
+                <tr><td>Patentstrikk</td><td>30–50 % mer garn</td></tr>
+                <tr><td>Strukturmønster</td><td>5–15 % mer garn</td></tr>
+                <tr><td>Hullmønster</td><td>5–15 % mindre garn</td></tr>
+                <tr><td>Rillestrikk</td><td>5–10 % mer garn</td></tr>
+                <tr><td>Dobbelt garn</td><td>40–50 % mer garn</td></tr>
+              </tbody>
+            </table>
+            <p>Dette er kun et omtrentlig estimat, så faktisk forbruk kan variere.</p>
+          </section>
+
+          <section id="skalering" ref={(el) => (refs.current["skalering"] = el)}>
+            <h2>📐 Skalere maskeantall</h2>
+            <p>
+              Har du en bunke deilig merinoull du vil strikke med, men oppskriften du drømmer om å strikke ikke samsvarer med garngruppen din? Det kan fint løses — man må bare skalere antall masker opp i mot strikkefastheten til garnet du ønsker å bruke.
+            </p>
+            <p>
+              Strikkefasthet måles i antall masker per 10 cm. Hvis du har færre masker per 10 cm enn hva oppskriften sier, vil plagget bli større — gå ned en pinnestørrelse. Hvis du har flere masker per 10 cm enn oppskriften sier, vil plagget bli mindre — gå opp en pinnestørrelse.
+            </p>
+            <p>
+              Dersom det å justere pinnestørrelsen ikke er nok, må du skalere i forhold til ny strikkefasthet. Si at oppskriften krever 10 m pr. 10 cm, mens garnet du ønsker å bruke gir 18 m pr. 10 cm. Da skalerer du:
+            </p>
+            <p style={{ fontFamily: "var(--font-mono)", textAlign: "center" }}>18 ÷ 10 = 1,8 (skalafaktor)</p>
+            <p>For å finne riktig antall masker du skal bruke i forhold til hva det står i oppskriften, gang antall masker med skalafaktoren: 10 masker × 1,8 = 18 masker pr. 10 cm.</p>
+
+            <h3>Flere eksempler</h3>
+            <table className="htable">
+              <thead><tr><th>Oppskriftens strikkefasthet</th><th>Din strikkefasthet</th><th>Skalafaktor</th></tr></thead>
+              <tbody>
+                <tr><td>20</td><td>18</td><td>0,9</td></tr>
+                <tr><td>20</td><td>22</td><td>1,1</td></tr>
+                <tr><td>24</td><td>20</td><td>0,83</td></tr>
+                <tr><td>18</td><td>22</td><td>1,22</td></tr>
+                <tr><td>28</td><td>17</td><td>0,6</td></tr>
+                <tr><td>12</td><td>31</td><td>2,58</td></tr>
+              </tbody>
+            </table>
+
+            <h3>Tilpasse bredden (maskeantall)</h3>
+            <p>
+              Oppskriften sier at du skal legge opp 120 masker ved strikkefasthet på 20 m pr. 10 cm, men din strikkefasthet er 22 m pr. 10 cm.
+            </p>
+            <p style={{ fontFamily: "var(--font-mono)", textAlign: "center" }}>(22 ÷ 20) × 120 = 132 masker</p>
+            <p>Det skal legges opp 132 masker for å få lik bredde på plagget som i opprinnelig oppskrift.</p>
+
+            <h3>Tilpasse lengden (antall omganger)</h3>
+            <p>
+              Oppskriften sier 60 omganger på 30 cm (20 omg. pr. 10 cm). Din strikkefasthet er 24 omg. pr. 10 cm.
+            </p>
+            <p style={{ fontFamily: "var(--font-mono)", textAlign: "center" }}>(24 ÷ 20) × 60 = 72 omganger</p>
+            <p>Du må strikke 72 omganger for å få lik lengde som i oppskriften.</p>
+
+            <div className="callout">
+              <b>Husk</b> — hvis du har flere masker enn oppskriften sier, må du gange med 1,xx. Hvis du har færre masker, må du gange med 0,xx for at antallet skal bli riktig. Vær obs på at hvis oppskriften har et mønster, må du tilpasse maskeantallet slik at det fortsatt er delelig på mønsterrapporten — det kan bli noen omganger hvor du må prøve deg frem.
+            </div>
+            <p>
+              Test alltid ut på en prøvelapp før du setter i gang med et større prosjekt, for å se at resultatet blir som forventet — og at du får riktig antall masker både i bredden og høyden. Mindre justeringer gjøres ofte ved å endre tykkelse på strikkepinnen, mens større justeringer gjøres ved å skalere opp eller ned.
+            </p>
+
+            <h3>Maskeantall fra kroppsmål</h3>
+            <p>
+              Mål av overkropp tas direkte på kroppen eller med tettsittende tøy — ikke stram målebåndet, da vil ikke målene stemme. Legg til 5–10 cm bevegelsesvidde, og inkluder dette i totalmålet når du skal regne antall masker.
+            </p>
+            <table className="htable">
+              <thead><tr><th>Mål</th><th>Beskrivelse</th></tr></thead>
+              <tbody>
+                <tr><td>Lengdemål (overkropp)</td><td>Fra der plagget skal starte (hofter/midje) og opp til skulder</td></tr>
+                <tr><td>Overvidde</td><td>Rundt det bredeste partiet ved brystene</td></tr>
+                <tr><td>Armlengde</td><td>Fra håndledd til armhule</td></tr>
+                <tr><td>Midjemål</td><td>Rundt det smaleste partiet av midjen</td></tr>
+                <tr><td>Hoftemål</td><td>Over det bredeste partiet, ofte over rompa</td></tr>
+                <tr><td>Lengdemål (underdel)</td><td>Fra under ankelen til skrittet + opp til linningen</td></tr>
+              </tbody>
+            </table>
+            <p>
+              Eksempel: ønsket garn gir 17 m på 10 cm, og omkretsen på plagget skal være 105 cm:
+            </p>
+            <p style={{ fontFamily: "var(--font-mono)", textAlign: "center" }}>(17 × 105) ÷ 10 = 178,5 ≈ 179 masker</p>
+            <p>Dersom dette tallet ikke går opp i forhold til mønsteret eller rapporten, runder du opp til nærmeste tall som blir riktig for ditt mønster.</p>
+          </section>
+
+          <section id="teknikker" ref={(el) => (refs.current["teknikker"] = el)}>
+            <h2>🪢 Grunnteknikker</h2>
+
+            <h3>Materialer og utstyr</h3>
+            <div className="fiber-row">
+              <img src="https://images.unsplash.com/photo-1604335398980-26ee5c5f9e9e?w=300&h=240&fit=crop" alt="Strikkepinner og garn" />
+              <p style={{ margin: 0 }}>
+                <b>Rette pinner / jumperpinner</b> med endestopper er supre til å strikke flate prosjekter, som skjerf. <b>Rundpinner</b> finnes i ulike lengder og er ment for ulike deler av prosjektet — små rundpinner på 40 cm er fine til ermer, rundpinner på 60 cm er fine til å strikke bolen til barneplagg, mens rundpinner på 80 cm passer fint til plagg i voksenstørrelse. <b>Strømpepinner</b> består av et sett med 5 korte pinner og brukes til nettopp strømper og sokker. Rundpinner kan bli for lange når masketallet blir så lite som på sokker eller små barneermer.
+              </p>
+            </div>
+            <p>
+              <b>Hjelpepinne</b> har en liten bue i midten og brukes når man skal lage vendinger — man setter av et gitt antall masker på hjelpepinnen, som holder maskene bak eller foran strikketøyet mens man strikker vendingen. Dette kan være ved flettestrikk eller liknende mønsterstrikk.
+            </p>
+
+            <h3>Tilbehør</h3>
+            <p>
+              <b>Maskemarkører</b> er nærmest essensielt når man strikker — velg helst i metall, da plastvarianter kan bli sprø og knekke over tid. <b>Målebånd</b> bør være av stoff, ellers kan målene bli feil. <b>Garnnål</b> er som en vanlig synål, men mye tykkere — brukes for å feste tråder; ha gjerne en med større nåløye for festing av tynnere garn. <b>Saks eller trådkutter</b> bør ligge i tilbehørsmappen — spesielt syntetisk garn har et sterkt behov for trådkutter, ellers vil du garantert få vondt i fingrene av å splitte tråden. <b>Garnskål</b> er kjekt for at garnet ikke skal hoppe rundt på gulvet.
+            </p>
+
+            <h3>Opplegg av masker</h3>
+            <p>
+              Det er flere måter å legge opp masker på. Noen ganger har man behov for elastisk kant, andre ganger er ikke dette så nøye. Det viktigste er at man ikke legger opp for stramt — maskene skal kunne bevege seg lett på pinnen.
+            </p>
+            <p>
+              <b>Long-tail cast-on</b> er en av de vanligste måtene å legge opp masker på, og er svært rask og effektiv. Legg på en vanlig slipknot med god del garn i enden (slipknoten er midt i alt garnet du bruker for å legge opp). Legg en tråd over tommelen og en over pekefingeren. Hent opp masker ved å tre strikkepinnen under garnet på tommelen, over garnet på pekefingeren og ned igjen gjennom tommelgarnet.
+            </p>
+            <div className="callout">
+              <b>Tips</b> — hvis du er redd for å sette av for mye garn kan du bruke både enden av innergarnet og yttergarnet til å legge opp. Da bruker du akkurat den mengden du trenger, og ikke noe mer.
+            </div>
+            <p>
+              <b>Tubular cast-on</b> er en metode som er super for opplegg til ribbekant. Denne gir en elastisk kant som er ideell til luer, sokker og halskanter. Metoden gir ingen definert begynnelse og gir dermed en sømløs finish.
+            </p>
+
+            <h3>Ribbestrikk</h3>
+            <p>
+              Ribbestrikk brukes ofte for å unngå at kanter ruller opp, for å gjøre åpninger mer elastiske, og for å gi en mer tettsittende fasong. Standard ribbestrikk er ulike kombinasjoner av rette og vrangmasker, f.eks. 1 r, 1 vr eller 2 r, 2 vr. Dette gir et smalt utseende og er en svært vanlig og anvendelig teknikk.
+            </p>
+
+            <h3>Italiensk ribb (tubular ribbing)</h3>
+            <p>
+              Stikk nålen inn i 1. maske som om den skal strikkes vrang og stram til. Ikke slipp masken av pinnen. Stikk nålen fra baksiden mellom 1. og 2. maske slik at tråden kommer på forsiden, så stikk nålen inn i vrangmasken. Deretter stikk nålen inn i 1. maske som om den skal strikkes rett, løft masken av pinnen.
+            </p>
+            <p>Når avfellingen starter:</p>
+            <p>
+              <b>1)</b> Når det er en vrang maske som skal felles av: stikk nålen inn i 2. maske (rettmaske) som om den skal strikkes vrang, stikk nålen inn i 1. maske (vrangmaske) som om den skal strikkes rett, løft masken av (tråden er nå på baksiden av arbeidet).
+            </p>
+            <p>
+              <b>2)</b> Når det er en rett maske som skal felles av: fra baksiden, stikk nålen mellom 1. og 2. maske. Fra forsiden, stikk nålen inn i vrangmasken (2. maske), også fra rettsiden stikk nålen inn i 1. maske som om den skal strikkes rett og løft av masken.
+            </p>
+            <p>
+              Gjenta 1) og 2) til arbeidet er ferdig avfelt. Italiensk ribb likner standard ribbestrikk, men har en mer avrundet og fyldig kant. Den har noe mindre spenst og tar noe lenger tid å strikke. Brukes ofte ved opplegg av masker eller ved avfelling av vanlig ribbestrikk.
+            </p>
+
+            <h3>Engelsk ribb (brioche ribbing)</h3>
+            <p>Strikkes 1 r, 1 kast, 2 m sammen. Gir en svært luftig og elastisk kant. Bruker noe mer garn enn vanlig ribb.</p>
+
+            <h3>Diagram</h3>
+            <p>
+              Dersom du skal lage ditt eget design, kan det være greit å få ned rapporter i et diagram. Strikkediagram leses nedenfra og opp, fra høyre til venstre (eventuelt høyre til venstre, venstre til høyre ved strikking frem og tilbake i stedet for rundstrikk). Klammer ([ ]) brukes for å vise at mønsteret skal gjentas. Bruk symboler i diagrammet med symbolforklaring på siden av diagrammet.
+            </p>
+          </section>
+
+          <section id="prosjekter" ref={(el) => (refs.current["prosjekter"] = el)}>
+            <h2>✨ Prosjektideer for restegarn</h2>
+            <p>
+              Det er veldig vanlig å bruke restegarn til småting, som sokker, babytøy, sjal og pannebånd. Men noen ganger kan det være litt gøy å bruke restegarnet til større prosjekter, som dekorative pledd, deilige gensere eller fine kofter.
+            </p>
+
+            <h3>Små prosjekter</h3>
+            <p>
+              Småstrikk er greit hvis du har et par nøster av samme farge og ønsker å strikke noe kjapt. En lue i garngruppe C krever ikke stort mer enn 100 g garn og er gjerne strikket på en kveld eller to.
+            </p>
+            <p>
+              Sokker er ofte tryggere å prøve seg frem med ulike fargekombinasjoner, ettersom sokker er et mer diskret plagg enn f.eks. et skjerf eller en lue. Det skal ikke så mye garn til for å få til et gøyalt mønster, og hvis du vil ha en liten utfordring kan du tegne opp ditt eget mønster. Det verste som kan skje er at du får noen morsomme sokker som uansett holder deg varm på beina.
+            </p>
+            <p>
+              Babystrikk gir mange muligheter for å bruke opp restegarn. Likt som sokker trenger man ikke stort mer enn 100–200 g garn til et fullt sett, hvis det er en oppskrift med lite mønsterstrikk. Babyplagg er også kjapt å strikke, så her får du unna litt av restelageret ditt på kort tid.
+            </p>
+
+            <div className="callout">
+              <b>Idé</b> — registrer prosjektene dine i "Prosjekter"-fanen og koble dem til garnet du bruker. Da ser du raskt hvilket garn som er i bruk, og kan planlegge neste restegarnprosjekt basert på hva som blir ledig.
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   STRIKKEHÅNDBOK — kjapp, praktisk oppslagsside
+   Fiberkvaliteter (varme, "fluffing", blokking, vask),
+   skalering, kombinering av garngrupper og mengdeberegning.
+   Supplert med eksterne kilder for å sikre korrekt fiberinfo.
+   ============================================================ */
+
+const QUICK_FIBERS = [
+  {
+    navn: "Ull (vanlig saueull)",
+    varme: "Varm, gode isolerende egenskaper",
+    fluffer: "Kan «bløme» (bloom) etter vask — fibrene retter seg ut og fyller mer, sting jevner seg ut",
+    blokking: "Tåler vanlig vått-blokking godt. Bruk lunkent vann, ikke gni eller vri",
+    vask: "Vanlig ull (uten Superwash) kan tove/krympe i varmt vann med bevegelse. Håndvask anbefales med mindre nøstet sier Superwash",
+    notat: "Bra til mønsterstrikk og toving — scales på fiberet gjør at mønster holder seg godt i form",
+  },
+  {
+    navn: "Superwash-ull",
+    varme: "Varm, men noe mindre elastisk enn vanlig ull",
+    fluffer: "Blømer mindre enn vanlig ull, men jevner seg fortsatt litt ut ved vask",
+    blokking: "Tåler vått-blokking, men kan «gi etter» og bli slappere/strekke seg — pass på å ikke blokke for stort",
+    vask: "Maskinvaskbar (følg vaskeanvisning), men kan likevel strekke seg over tid i vask",
+    notat: "Fiberets ytterste lag er behandlet så det ikke filtrer seg — derfor egner det seg dårlig til toving",
+  },
+  {
+    navn: "Merinoull",
+    varme: "Varm og myk, finere fiber enn norsk ull",
+    fluffer: "Blømer fint etter vask, blir mykere",
+    blokking: "Tåler vått-blokking godt, gjerne med litt drapering for sjal og finstrikk",
+    vask: "Håndvask med mindre merket Superwash. Unngå varmt vann og bevegelse",
+    notat: "Mykt nok til babytøy og plagg mot huden",
+  },
+  {
+    navn: "Alpakka / Baby alpakka",
+    varme: "Svært varm — opp mot 3x varmere enn saueull",
+    fluffer: "Blømer lite, men blir mykere og får bedre drapering etter vask",
+    blokking: "Tåler lett vått-blokking, men strekk seg lett pga. lav elastisitet — ikke strekk for hardt, særlig i ribbekanter",
+    vask: "Håndvask i kjølig/lunkent vann uten gnidning. Tørkes flatt — ikke hengende, da tøyer plagget seg ut",
+    notat: "Glatte fibre gjør at alpakka nupper lite. Inneholder ikke lanolin og er allergivennlig",
+  },
+  {
+    navn: "Mohair",
+    varme: "Svært varm og luftig — fungerer som isolerende ytterlag",
+    fluffer: "Blømer mye! Den karakteristiske «haloen» kommer fram etter første vask/blokking",
+    blokking: "Lett vått-blokking — press ut vann i et håndkle, ikke vri. La tørke flatt. Børst gjerne luftig med fingrene eller en myk kam etterpå",
+    vask: "Håndvask i lunkent (ikke varmt) vann med mild sjampo/ullvask. Unngå kraftig bevegelse — fiberet kan filtre seg",
+    notat: "Vanskelig å rekke opp pga. den luftige strukturen. Brukes ofte som tilleggstråd for å gi glans og luftighet til et annet garn",
+  },
+  {
+    navn: "Kashmir",
+    varme: "Svært varm (ca. 3x saueull) takket være ekstremt tynne fibre",
+    fluffer: "Blømer en del og blir mykere etter vask",
+    blokking: "Tåler skånsom vått-blokking. Unngå overstrekk siden fibrene er fine og kan svekkes",
+    vask: "Kun håndvask, kaldt/lunkent vann, mild ullvask. Tørk flatt",
+    notat: "Et av de mykeste garnene som finnes — perfekt mot huden, men kostbart og bør behandles varsomt",
+  },
+  {
+    navn: "Silke (i blanding)",
+    varme: "Holder på varme og er svært formstabilt",
+    fluffer: "Blømer ikke som ull — silke gir glans og glatthet i stedet for luftighet",
+    blokking: "Tåler vått-blokking, men strekker seg permanent — ikke strekk silkeblandinger ut over ønsket størrelse, det går ikke tilbake",
+    vask: "Håndvask i kjølig vann. Følg den mest ømfintlige fiberen i blandingen (ofte ull) for vaskeråd",
+    notat: "Et av de sterkeste naturfibrene — gir styrke og glans når det kombineres med andre fibre",
+  },
+  {
+    navn: "Bomull (inkl. mercerisert)",
+    varme: "Svalt og luftig — passer til sommerplagg",
+    fluffer: "Blømer ikke nevneverdig. Mercerisert bomull holder formen sin godt og krymper lite",
+    blokking: "Tåler vått-blokking godt og formes lett, men ren bomull har lite «hukommelse» — strikketøyet kan henge/tøye seg over tid pga. tyngden",
+    vask: "Maskinvaskbart, tåler varme bedre enn animalske fibre. Kan krympe noe første gang (ikke mercerisert)",
+    notat: "Lite elastisk — vurder å kombinere med et fiber som har mer spenst for plagg som skal sitte tett",
+  },
+  {
+    navn: "Lin",
+    varme: "Temperaturregulerende — svalt om sommeren, holder på varme i kjøligere vær",
+    fluffer: "Blir mykere for hver vask, men blømer ikke som ull",
+    blokking: "Tåler vått-blokking godt, formes lett når fuktig",
+    vask: "Maskinvaskbart og tåler høyere temperaturer enn de fleste fibre",
+    notat: "Stivt i starten — mykner betraktelig med bruk og vask",
+  },
+  {
+    navn: "Viskose / Bambus / Modal / Lyocell",
+    varme: "Svale, luftige fibre — gode til sommerplagg og blandinger",
+    fluffer: "Blømer ikke, men kan få bedre drapering etter vask",
+    blokking: "Tåler lett vått-blokking, men er tyngre og kan tøye seg ut av egen vekt — unngå å henge fuktige plagg av disse fibrene",
+    vask: "Håndvask anbefales, da fiberet er svakere når det er vått enn når det er tørt",
+    notat: "Glatt og glansfullt, men kan «sige» i fasongen over tid i tunge prosjekter som pledd",
+  },
+  {
+    navn: "Akryl",
+    varme: "Varmt og lett, men puster mindre enn naturfibre",
+    fluffer: "Blømer ikke — akryl endrer seg lite ved vask",
+    blokking: "Vått-blokking har begrenset effekt fordi akryl ikke har samme «hukommelse» som ull. Damp-blokking kan smelte/skade fiberet — unngå direkte varme",
+    vask: "Vanligvis maskinvaskbart og tørkes raskt, men kan bli statisk og nuppe over tid",
+    notat: "Holder godt på fargen og er rimelig, men kortere fibre gjør at det nupper lettere enn naturfibre med lange fibre",
+  },
+  {
+    navn: "Nylon / Polyester (i blanding)",
+    varme: "Tilfører lite varme selv, men gir styrke til blandingen",
+    fluffer: "Blømer ikke, men kan gjøre at ull-blandinger blømer noe mindre enn ren ull",
+    blokking: "Vått-blokking fungerer som for hovedfiberet i blandingen, men formen «setter» seg mindre permanent",
+    vask: "Følg vaskeanvisning for hovedfiberet. Polyester er fargeekte og tørker raskt",
+    notat: "Vanlig i sokkegarn for ekstra slitestyrke og elastisitet",
+  },
+];
+
+function QuickHandbookView() {
+  const [openFiber, setOpenFiber] = useState(null);
+  const [openSection, setOpenSection] = useState("fiber");
+
+  return (
+    <div>
+      <div className="view-header">
+        <div>
+          <h1 className="view-title">Strikkehåndbok</h1>
+          <p className="view-desc">
+            Kjapp oppslagsside: trykk deg inn på det du trenger hjelp med — fiberkvaliteter (varme, «fluffing», blokking og vask), kombinering av garngrupper, og utregning av skalering og garnmengde.
+          </p>
+        </div>
+      </div>
+
+      <div className="chip-group" style={{ marginBottom: 20 }}>
+        <button className={`chip ${openSection === "fiber" ? "active" : ""}`} onClick={() => setOpenSection("fiber")}>Fiberkvaliteter</button>
+        <button className={`chip ${openSection === "garngrupper" ? "active" : ""}`} onClick={() => setOpenSection("garngrupper")}>Garngrupper &amp; kombinering</button>
+        <button className={`chip ${openSection === "skalering" ? "active" : ""}`} onClick={() => setOpenSection("skalering")}>Skalering</button>
+        <button className={`chip ${openSection === "mengde" ? "active" : ""}`} onClick={() => setOpenSection("mengde")}>Garnmengde til prosjekt</button>
+      </div>
+
+      {openSection === "fiber" && (
+        <div>
+          <p style={{ fontSize: 13, color: "var(--walnut-soft)", marginBottom: 16 }}>
+            Trykk på et fiber for å se hvordan det varmer, om det «fluffer» seg opp etter vask (blømer), om det er egnet til blokking, og hvordan det bør vaskes.
+          </p>
+          {QUICK_FIBERS.map((f) => (
+            <div key={f.navn} className="calc-card" style={{ marginBottom: 10, padding: 0, overflow: "hidden" }}>
+              <button
+                onClick={() => setOpenFiber(openFiber === f.navn ? null : f.navn)}
+                style={{
+                  width: "100%", textAlign: "left", padding: "16px 20px", background: "none", border: "none",
+                  cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center",
+                  fontFamily: "var(--font-display)", fontSize: 17, fontWeight: 600, color: "var(--walnut)",
+                }}
+                aria-expanded={openFiber === f.navn}
+              >
+                {f.navn}
+                <span style={{ fontFamily: "var(--font-mono)", fontSize: 16, color: "var(--walnut-soft)" }}>{openFiber === f.navn ? "−" : "+"}</span>
+              </button>
+              {openFiber === f.navn && (
+                <div style={{ padding: "0 20px 20px 20px" }}>
+                  <div className="detail-field-grid" style={{ marginTop: 0 }}>
+                    <div className="detail-field" style={{ gridColumn: "1 / -1" }}>
+                      <span className="label">🔥 Varme</span>
+                      <span className="value" style={{ fontWeight: 400 }}>{f.varme}</span>
+                    </div>
+                    <div className="detail-field" style={{ gridColumn: "1 / -1" }}>
+                      <span className="label">☁️ Fluffer / blømer etter vask</span>
+                      <span className="value" style={{ fontWeight: 400 }}>{f.fluffer}</span>
+                    </div>
+                    <div className="detail-field" style={{ gridColumn: "1 / -1" }}>
+                      <span className="label">📐 Blokking</span>
+                      <span className="value" style={{ fontWeight: 400 }}>{f.blokking}</span>
+                    </div>
+                    <div className="detail-field" style={{ gridColumn: "1 / -1" }}>
+                      <span className="label">🧼 Vask</span>
+                      <span className="value" style={{ fontWeight: 400 }}>{f.vask}</span>
+                    </div>
+                  </div>
+                  <div className="callout" style={{ marginTop: 10, marginBottom: 0 }}>{f.notat}</div>
+                </div>
+              )}
+            </div>
+          ))}
+          <p style={{ fontSize: 11.5, color: "var(--walnut-soft)", marginTop: 16, fontStyle: "italic" }}>
+            Kilder: generelle anbefalinger fra garnprodusenter og strikkeguider om fiberegenskaper, blokking og vask av ull, alpakka, mohair og superwash-garn.
+          </p>
+        </div>
+      )}
+
+      {openSection === "garngrupper" && (
+        <div>
+          <div className="calc-card">
+            <h3>Garngrupper</h3>
+            <p className="calc-desc">Garn deles inn i grupper etter tykkelse. Garn i samme gruppe skal ha lik strikkefasthet, men løpelengde (m/50g) kan variere mellom garntyper i samme gruppe.</p>
+            <table className="htable">
+              <thead><tr><th>Gruppe</th><th>Navn</th><th>Strikkefasthet (m/10cm)</th><th>Pinne</th></tr></thead>
+              <tbody>
+                {Object.entries(GARNGRUPPER).map(([k, g]) => (
+                  <tr key={k}>
+                    <td><span className={`tag group-${k}`}>{k}</span></td>
+                    <td>{g.navn}</td>
+                    <td>{g.strikkefasthet}</td>
+                    <td>{g.pinneStrikk}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="calc-card">
+            <h3>Kombinere flere tråder</h3>
+            <p className="calc-desc">Tommelfingerregler for å oppnå en tykkere garngruppe ved å holde flere tråder sammen:</p>
+            <table className="htable">
+              <thead><tr><th>Kombinasjon</th><th>Tilsvarer</th></tr></thead>
+              <tbody>
+                <tr><td>2 tråder A (Lace)</td><td>1 tråd C (DK)</td></tr>
+                <tr><td>3 tråder A (Lace)</td><td>1 tråd D (Worsted)</td></tr>
+                <tr><td>4 tråder A (Lace)</td><td>1 tråd E (Chunky)</td></tr>
+                <tr><td>8 tråder A (Lace)</td><td>1 tråd F (Super bulky)</td></tr>
+                <tr><td>2 tråder B (Sport)</td><td>1 tråd D (Worsted)</td></tr>
+                <tr><td>2 tråder C (DK)</td><td>1 tråd E (Chunky)</td></tr>
+                <tr><td>4 tråder C (DK)</td><td>1 tråd F (Super bulky)</td></tr>
+                <tr><td>2 tråder E (Chunky)</td><td>1 tråd F (Super bulky)</td></tr>
+              </tbody>
+            </table>
+            <div className="callout">Test alltid med en prøvelapp — resultatet varierer med fibertype, tvinning og strikkefasthet.</div>
+            <p style={{ marginTop: 12, marginBottom: 0 }}>Gå til <b>Kalkulator</b>-fanen for å regne ut nøyaktig hvor mange nøster du trenger når du bytter garn.</p>
+          </div>
+        </div>
+      )}
+
+      {openSection === "skalering" && (
+        <div>
+          <div className="calc-card">
+            <h3>Skalere maskeantall etter strikkefasthet</h3>
+            <p className="calc-desc">
+              Strikkefasthet måles i masker per 10 cm. Har du <b>færre</b> masker per 10 cm enn oppskriften, blir plagget større — gå ned en pinnestørrelse. Har du <b>flere</b> masker per 10 cm enn oppskriften, blir plagget mindre — gå opp en pinnestørrelse.
+            </p>
+            <p>Hvis pinnejustering ikke er nok, skaler i forhold til ny strikkefasthet:</p>
+            <p style={{ fontFamily: "var(--font-mono)", textAlign: "center" }}>skalafaktor = din strikkefasthet ÷ oppskriftens strikkefasthet</p>
+            <p style={{ fontFamily: "var(--font-mono)", textAlign: "center" }}>nytt maskeantall = oppskriftens maskeantall × skalafaktor</p>
+            <div className="callout">
+              Hvis oppskriften har et mønster, må det nye maskeantallet rundes av slik at det er delelig på mønsterrapporten.
+            </div>
+            <p style={{ marginBottom: 0 }}>Gå til <b>Kalkulator</b>-fanen for å regne dette ut automatisk — både for maskeantall, omganger og fra kroppsmål.</p>
+          </div>
+        </div>
+      )}
+
+      {openSection === "mengde" && (
+        <div>
+          <div className="calc-card">
+            <h3>Lue</h3>
+            <table className="htable">
+              <thead><tr><th>Størrelse</th><th>Ca. meter</th></tr></thead>
+              <tbody>
+                <tr><td>Baby (prematur)</td><td>40–60 m</td></tr>
+                <tr><td>Baby 0–3 mnd</td><td>50–70 m</td></tr>
+                <tr><td>Baby 3–6 mnd</td><td>60–80 m</td></tr>
+                <tr><td>Barn 1–3 år</td><td>80–100 m</td></tr>
+                <tr><td>Barn 4–8 år</td><td>100–130 m</td></tr>
+                <tr><td>Barn 9–12 år</td><td>120–150 m</td></tr>
+                <tr><td>Dame / Herre S–M</td><td>130–160 m</td></tr>
+                <tr><td>Dame / Herre L–XL</td><td>150–200 m</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div className="calc-card">
+            <h3>Votter og hansker</h3>
+            <table className="htable">
+              <thead><tr><th>Størrelse</th><th>Ca. meter</th></tr></thead>
+              <tbody>
+                <tr><td>Baby 0–12 mnd</td><td>30–50 m</td></tr>
+                <tr><td>Barn 1–4 år</td><td>50–80 m</td></tr>
+                <tr><td>Barn 5–10 år</td><td>80–110 m</td></tr>
+                <tr><td>Dame S–M</td><td>100–130 m</td></tr>
+                <tr><td>Dame L / Herre S</td><td>120–150 m</td></tr>
+                <tr><td>Herre M–XL</td><td>140–180 m</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div className="calc-card">
+            <h3>Sokker</h3>
+            <table className="htable">
+              <thead><tr><th>Størrelse</th><th>Ca. meter</th></tr></thead>
+              <tbody>
+                <tr><td>Baby 0–12 mnd</td><td>40–70 m</td></tr>
+                <tr><td>Barn 1–4 år (str. 20–24)</td><td>70–100 m</td></tr>
+                <tr><td>Barn 5–10 år (str. 25–32)</td><td>100–150 m</td></tr>
+                <tr><td>Dame S (str. 36–37)</td><td>200–250 m</td></tr>
+                <tr><td>Dame M (str. 38–39)</td><td>230–280 m</td></tr>
+                <tr><td>Dame L (str. 40–41)</td><td>260–320 m</td></tr>
+                <tr><td>Herre S (str. 40–41)</td><td>280–340 m</td></tr>
+                <tr><td>Herre M (str. 42–43)</td><td>320–380 m</td></tr>
+                <tr><td>Herre L (str. 44–46)</td><td>360–430 m</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div className="calc-card">
+            <h3>Genser / jakke</h3>
+            <table className="htable">
+              <thead><tr><th>Størrelse</th><th>Ca. meter</th></tr></thead>
+              <tbody>
+                <tr><td>Baby 0–3 mnd</td><td>180–250 m</td></tr>
+                <tr><td>Baby 3–6 mnd</td><td>220–300 m</td></tr>
+                <tr><td>Baby 6–12 mnd</td><td>270–360 m</td></tr>
+                <tr><td>Barn 1–2 år</td><td>350–450 m</td></tr>
+                <tr><td>Barn 3–4 år</td><td>400–520 m</td></tr>
+                <tr><td>Barn 5–6 år</td><td>480–580 m</td></tr>
+                <tr><td>Barn 7–8 år</td><td>540–650 m</td></tr>
+                <tr><td>Barn 9–10 år</td><td>620–730 m</td></tr>
+                <tr><td>Barn 11–12 år</td><td>700–850 m</td></tr>
+                <tr><td>Dame XS (32–34)</td><td>700–800 m</td></tr>
+                <tr><td>Dame S (36–38)</td><td>800–900 m</td></tr>
+                <tr><td>Dame M (40–42)</td><td>900–1050 m</td></tr>
+                <tr><td>Dame L (44–46)</td><td>1050–1200 m</td></tr>
+                <tr><td>Dame XL (48–50)</td><td>1150–1350 m</td></tr>
+                <tr><td>Dame XXL (52–54)</td><td>1300–1500 m</td></tr>
+                <tr><td>Herre S (44–46)</td><td>1000–1200 m</td></tr>
+                <tr><td>Herre M (48–50)</td><td>1200–1400 m</td></tr>
+                <tr><td>Herre L (52–54)</td><td>1350–1550 m</td></tr>
+                <tr><td>Herre XL (56–58)</td><td>1500–1750 m</td></tr>
+              </tbody>
+            </table>
+            <div className="callout">Tallene gjelder rundstrikk i glattStrikk (rettmasker). Legg til 10–50 % for fletter, mønster og patentstrikk (se under).</div>
+          </div>
+
+          <div className="calc-card">
+            <h3>Skjerf og sjal</h3>
+            <table className="htable">
+              <thead><tr><th>Type</th><th>Ca. meter</th></tr></thead>
+              <tbody>
+                <tr><td>Babyteppe 60×80</td><td>400–700 m</td></tr>
+                <tr><td>Babyteppe 80×100</td><td>700–1000 m</td></tr>
+                <tr><td>Skjerf barn</td><td>150–250 m</td></tr>
+                <tr><td>Skjerf voksen, kort</td><td>300–500 m</td></tr>
+                <tr><td>Skjerf voksen, lang</td><td>500–800 m</td></tr>
+                <tr><td>Sjal (trekant/halvmåne)</td><td>400–900 m</td></tr>
+                <tr><td>Teppe lite (100×130)</td><td>1000–1500 m</td></tr>
+                <tr><td>Teppe stort (140×200)</td><td>2000–3000 m</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div className="calc-card">
+            <h3>Mønster og struktur påvirker forbruket</h3>
+            <table className="htable">
+              <thead><tr><th>Teknikk</th><th>Endring</th></tr></thead>
+              <tbody>
+                <tr><td>Ribbestrikk</td><td>+5–10 %</td></tr>
+                <tr><td>Fletter</td><td>+10–25 %</td></tr>
+                <tr><td>Patentstrikk</td><td>+30–50 %</td></tr>
+                <tr><td>Strukturmønster</td><td>+5–15 %</td></tr>
+                <tr><td>Hullmønster</td><td>−5–15 %</td></tr>
+                <tr><td>Dobbelt garn</td><td>+40–50 %</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <p style={{ fontSize: 12.5, color: "var(--walnut-soft)", marginTop: 8 }}>
+            Alle tall er omtrentlige og basert på glattStrikk (rettmasker) med standard strikkefasthet for garngruppen. Tykkere garn (færre masker per 10 cm) bruker færre meter for samme plagg.
+            Gå til <b>Kalkulator</b>-fanen for å bytte ut garn med annen løpelengde.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(<App />);
+</script>
+</body>
+</html>
