@@ -413,27 +413,56 @@ function App() {
   const [user, setUser] = useState(undefined); // undefined = sjekker ennå, null = ikke innlogget
   const [signingIn, setSigningIn] = useState(false);
 
-  // Auth listener + håndter redirect-resultat (Safari/mobil)
+  // Auth: håndter redirect-resultat FØR onAuthStateChanged setter user=null
   useEffect(() => {
-    // Hent redirect-resultat først (Safari hopper tilbake hit etter Google-innlogging)
-    window._auth.getRedirectResult().catch(() => {});
+    let unsubscribed = false;
 
-    const unsub = window._auth.onAuthStateChanged(async (u) => {
-      setUser(u || null);
-      if (u) {
-        const [y, t, p] = await Promise.all([
-          loadData("yarns", u.uid, []),
-          loadData("tools", u.uid, []),
-          loadData("projects", u.uid, []),
-        ]);
-        setYarns(y); setTools(t); setProjects(p);
-        setLoaded(true);
-      } else {
-        setYarns(null); setTools(null); setProjects(null);
-        setLoaded(false);
+    async function init() {
+      try {
+        // Sett lokal persistens (overlever Safari-restart)
+        await window._auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+      } catch(e) {}
+
+      // VIKTIG: vent på redirect-resultat før vi lytter på auth-state
+      // Safari: etter redirect er currentUser null i et øyeblikk før getRedirectResult løser seg
+      try {
+        const result = await window._auth.getRedirectResult();
+        if (result && result.user) {
+          // Redirect-innlogging vellykket — onAuthStateChanged vil nå fange den
+        }
+      } catch(e) {
+        console.error("Redirect-feil:", e.code, e.message);
       }
-    });
-    return () => unsub();
+
+      // Nå kan vi lytte trygt
+      const unsub = window._auth.onAuthStateChanged(async (u) => {
+        if (unsubscribed) return;
+        setUser(u || null);
+        if (u) {
+          const [y, t, p] = await Promise.all([
+            loadData("yarns", u.uid, []),
+            loadData("tools", u.uid, []),
+            loadData("projects", u.uid, []),
+          ]);
+          if (!unsubscribed) {
+            setYarns(y); setTools(t); setProjects(p);
+            setLoaded(true);
+          }
+        } else {
+          setYarns(null); setTools(null); setProjects(null);
+          setLoaded(false);
+        }
+      });
+
+      return unsub;
+    }
+
+    let unsubFn = null;
+    init().then(fn => { unsubFn = fn; });
+    return () => {
+      unsubscribed = true;
+      if (unsubFn) unsubFn();
+    };
   }, []);
 
   // Auto-save
@@ -449,7 +478,7 @@ function App() {
   function handleSignIn() {
     setSigningIn(true);
     const provider = new firebase.auth.GoogleAuthProvider();
-    // Alltid redirect — fungerer på Safari, Chrome, mobil og desktop
+    provider.setCustomParameters({ prompt: "select_account" });
     window._auth.signInWithRedirect(provider);
   }
 
@@ -2952,7 +2981,6 @@ function QuickHandbookView() {
     </div>
   );
 }
-
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(<App />);
