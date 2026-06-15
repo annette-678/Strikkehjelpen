@@ -413,8 +413,11 @@ function App() {
   const [user, setUser] = useState(undefined); // undefined = sjekker ennå, null = ikke innlogget
   const [signingIn, setSigningIn] = useState(false);
 
-  // Auth listener
+  // Auth listener + håndter redirect-resultat (Safari/mobil)
   useEffect(() => {
+    // Hent redirect-resultat først (Safari hopper tilbake hit etter Google-innlogging)
+    window._auth.getRedirectResult().catch(() => {});
+
     const unsub = window._auth.onAuthStateChanged(async (u) => {
       setUser(u || null);
       if (u) {
@@ -446,12 +449,8 @@ function App() {
   function handleSignIn() {
     setSigningIn(true);
     const provider = new firebase.auth.GoogleAuthProvider();
-    const isMobile = /iPhone|iPad|Android/i.test(navigator.userAgent);
-    if (isMobile) {
-      window._auth.signInWithRedirect(provider);
-    } else {
-      window._auth.signInWithPopup(provider).catch(() => setSigningIn(false));
-    }
+    // Alltid redirect — fungerer på Safari, Chrome, mobil og desktop
+    window._auth.signInWithRedirect(provider);
   }
 
   function handleSignOut() {
