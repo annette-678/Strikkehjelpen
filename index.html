@@ -537,9 +537,10 @@ function App() {
     })();
   }, [user]);
 
-  // Auto-save med synlig status
-  const [saveStatus, setSaveStatus] = useState(null); // "lagrer" | "lagret" | "feil"
+  // Auto-save med synlig status — kun etter at bruker har gjort endringer (ikke ved første lasting)
+  const [saveStatus, setSaveStatus] = useState(null);
   const saveTimer = useRef(null);
+  const initialLoad = useRef(true);
 
   async function doSave(key, value, uid) {
     setSaveStatus("lagrer");
@@ -549,9 +550,32 @@ function App() {
     saveTimer.current = setTimeout(() => setSaveStatus(null), 2500);
   }
 
-  useEffect(() => { if (loaded && user && yarns !== null) doSave("yarns", yarns, user.uid); }, [yarns, loaded]);
-  useEffect(() => { if (loaded && user && tools !== null) doSave("tools", tools, user.uid); }, [tools, loaded]);
-  useEffect(() => { if (loaded && user && projects !== null) doSave("projects", projects, user.uid); }, [projects, loaded]);
+  useEffect(() => {
+    if (!loaded || !user || yarns === null) return;
+    if (initialLoad.current) return; // ikke lagre ved første lasting
+    doSave("yarns", yarns, user.uid);
+  }, [yarns]);
+
+  useEffect(() => {
+    if (!loaded || !user || tools === null) return;
+    if (initialLoad.current) return;
+    doSave("tools", tools, user.uid);
+  }, [tools]);
+
+  useEffect(() => {
+    if (!loaded || !user || projects === null) return;
+    if (initialLoad.current) return;
+    doSave("projects", projects, user.uid);
+  }, [projects]);
+
+  // Merk at initial lasting er ferdig etter første render med data
+  useEffect(() => {
+    if (loaded) {
+      // Vent én render-syklus før vi tillater auto-save
+      const t = setTimeout(() => { initialLoad.current = false; }, 500);
+      return () => clearTimeout(t);
+    }
+  }, [loaded]);
 
   function showToast(msg) {
     setToast(msg);
@@ -636,6 +660,9 @@ function App() {
                   {saveStatus === "lagrer" ? "⏳ lagrer …" : saveStatus === "lagret" ? "✓ lagret" : "✗ lagringsfeil"}
                 </span>
               )}
+              <span style={{ fontFamily:"var(--font-mono)", fontSize:10, color:"var(--walnut-soft)", maxWidth:120, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                uid: {user?.uid ? user.uid.slice(0,12)+"…" : "MANGLER!"}
+              </span>
               {user.photoURL && <img src={user.photoURL} alt="" style={{ width:28, height:28, borderRadius:"50%", border:"1.5px solid var(--taupe-line)" }} />}
               <button className="btn btn-outline btn-sm" onClick={handleSignOut}>Logg ut</button>
             </div>
