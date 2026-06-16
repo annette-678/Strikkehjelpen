@@ -420,8 +420,8 @@ function resizeImage(dataUrl, maxDim = 800, quality = 0.78) {
 /* ---------- Google Identity Services innlogging ---------- */
 function LoginScreen({ onLogin }) {
   const btnRef = useRef(null);
-  const [gsiReady, setGsiReady] = useState(false);
   const [error, setError] = useState(null);
+  const [gsiReady, setGsiReady] = useState(false);
 
   useEffect(() => {
     function initGSI() {
@@ -429,9 +429,9 @@ function LoginScreen({ onLogin }) {
       window.google.accounts.id.initialize({
         client_id: GOOGLE_CLIENT_ID,
         callback: (response) => {
-          // Decode JWT-token fra Google
           try {
-            const payload = JSON.parse(atob(response.credential.split(".")[1]));
+            const base64 = response.credential.split(".")[1].replace(/-/g,"+").replace(/_/g,"/");
+            const payload = JSON.parse(atob(base64));
             const user = {
               uid: payload.sub,
               name: payload.name,
@@ -441,49 +441,42 @@ function LoginScreen({ onLogin }) {
             window._setStoredUser(user);
             onLogin(user);
           } catch(e) {
-            setError("Innlogging feilet. Prøv igjen.");
+            setError("Innlogging feilet — prøv igjen.");
           }
         },
         ux_mode: "popup",
         auto_select: false,
+        cancel_on_tap_outside: false,
       });
+
+      // Render den offisielle Google-knappen direkte i btnRef
+      if (btnRef.current) {
+        window.google.accounts.id.renderButton(btnRef.current, {
+          type: "standard",
+          theme: "outline",
+          size: "large",
+          text: "signin_with",
+          shape: "rectangular",
+          logo_alignment: "left",
+          width: 280,
+          locale: "no",
+        });
+      }
       setGsiReady(true);
     }
 
-    // GSI-scriptet kan allerede være lastet
     if (window.google && window.google.accounts) {
       initGSI();
     } else {
-      // Vent til det lastes
       const interval = setInterval(() => {
         if (window.google && window.google.accounts) {
           clearInterval(interval);
           initGSI();
         }
-      }, 100);
+      }, 150);
       return () => clearInterval(interval);
     }
   }, []);
-
-  function handleSignIn() {
-    if (!gsiReady) return;
-    setError(null);
-    window.google.accounts.id.prompt((notification) => {
-      if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-        // Prompt blokkert (f.eks. av Safari) — vis knapp i stedet
-        if (btnRef.current) {
-          window.google.accounts.id.renderButton(btnRef.current, {
-            type: "standard",
-            theme: "outline",
-            size: "large",
-            text: "signin_with",
-            locale: "nb",
-          });
-          btnRef.current.querySelector("div[role=button]")?.click();
-        }
-      }
-    });
-  }
 
   return (
     <div className="garnlager-root">
@@ -493,16 +486,18 @@ function LoginScreen({ onLogin }) {
           <div style={{ fontSize:56, marginBottom:16 }}>🧶</div>
           <h1 style={{ fontFamily:"var(--font-display)", fontStyle:"italic", fontSize:38,
             margin:"0 0 10px 0", color:"var(--walnut)" }}>Garnlager</h1>
-          <p style={{ color:"var(--walnut-soft)", fontSize:14, lineHeight:1.6, margin:"0 0 28px 0" }}>
+          <p style={{ color:"var(--walnut-soft)", fontSize:14, lineHeight:1.6, margin:"0 0 32px 0" }}>
             Logg inn med Google for å få tilgang til garnlageret ditt — synkronisert på alle enheter.
           </p>
-          {error && <p style={{ color:"var(--terracotta)", fontSize:13, marginBottom:16 }}>{error}</p>}
-          <button className="btn" onClick={handleSignIn} disabled={!gsiReady}
-            style={{ fontSize:15, padding:"13px 28px", width:"100%", justifyContent:"center", marginBottom:16 }}>
-            {gsiReady ? "🔑  Logg inn med Google" : "Laster …"}
-          </button>
-          {/* Fallback GSI-knapp (vises om prompt blokkeres) */}
-          <div ref={btnRef} style={{ display:"flex", justifyContent:"center" }}></div>
+          {error && (
+            <p style={{ color:"var(--terracotta)", fontSize:13, marginBottom:16 }}>{error}</p>
+          )}
+          {/* Offisiell Google Sign-In knapp — fungerer i alle nettlesere */}
+          <div ref={btnRef} style={{ display:"flex", justifyContent:"center", minHeight:44 }}>
+            {!gsiReady && (
+              <div style={{ color:"var(--walnut-soft)", fontSize:13 }}>Laster innlogging …</div>
+            )}
+          </div>
         </div>
       </div>
     </div>
