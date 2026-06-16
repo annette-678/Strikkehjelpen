@@ -358,21 +358,26 @@ const GARNLAGER_CSS = `
 
 /* ---------- Firestore storage helpers ---------- */
 async function loadData(key, uid, fallback) {
-  if (!uid) return fallback;
+  if (!uid) { console.warn("loadData: ingen uid"); return fallback; }
   try {
     const snap = await window._db.collection("users").doc(uid)
       .collection("garnlager").doc(key).get();
+    console.log("loadData", key, "exists:", snap.exists, "uid:", uid.slice(0,8));
     if (snap.exists) return snap.data().value ?? fallback;
-  } catch(e) { console.error("Last feilet", key, e); }
+  } catch(e) { console.error("Last feilet", key, e.code, e.message); }
   return fallback;
 }
 async function saveData(key, value, uid) {
-  if (!uid) return false;
+  if (!uid) { console.warn("saveData: ingen uid"); return false; }
   try {
     await window._db.collection("users").doc(uid)
       .collection("garnlager").doc(key).set({ value });
+    console.log("saveData OK", key, "uid:", uid.slice(0,8));
     return true;
-  } catch(e) { console.error("Lagring feilet", key, e); return false; }
+  } catch(e) {
+    console.error("Lagring feilet", key, e.code, e.message);
+    return false;
+  }
 }
 
 /* ---------- image helpers ---------- */
@@ -537,10 +542,21 @@ function App() {
     })();
   }, [user]);
 
-  // Auto-save
-  useEffect(() => { if (loaded && user && yarns !== null) saveData("yarns", yarns, user.uid); }, [yarns, loaded]);
-  useEffect(() => { if (loaded && user && tools !== null) saveData("tools", tools, user.uid); }, [tools, loaded]);
-  useEffect(() => { if (loaded && user && projects !== null) saveData("projects", projects, user.uid); }, [projects, loaded]);
+  // Auto-save med synlig status
+  const [saveStatus, setSaveStatus] = useState(null); // "lagrer" | "lagret" | "feil"
+  const saveTimer = useRef(null);
+
+  async function doSave(key, value, uid) {
+    setSaveStatus("lagrer");
+    const ok = await saveData(key, value, uid);
+    setSaveStatus(ok ? "lagret" : "feil");
+    clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => setSaveStatus(null), 2500);
+  }
+
+  useEffect(() => { if (loaded && user && yarns !== null) doSave("yarns", yarns, user.uid); }, [yarns, loaded]);
+  useEffect(() => { if (loaded && user && tools !== null) doSave("tools", tools, user.uid); }, [tools, loaded]);
+  useEffect(() => { if (loaded && user && projects !== null) doSave("projects", projects, user.uid); }, [projects, loaded]);
 
   function showToast(msg) {
     setToast(msg);
@@ -615,6 +631,16 @@ function App() {
               <div><b>{finishedProjects}</b>ferdige</div>
             </div>
             <div style={{ display:"flex", alignItems:"center", gap:8, flexShrink:0 }}>
+              {saveStatus && (
+                <span style={{
+                  fontFamily:"var(--font-mono)", fontSize:11, padding:"4px 10px",
+                  borderRadius:100, border:"1px solid var(--taupe-line)",
+                  background: saveStatus === "feil" ? "#FEE" : "var(--cream-deep)",
+                  color: saveStatus === "feil" ? "var(--terracotta)" : saveStatus === "lagret" ? "var(--moss)" : "var(--walnut-soft)"
+                }}>
+                  {saveStatus === "lagrer" ? "⏳ lagrer …" : saveStatus === "lagret" ? "✓ lagret" : "✗ lagringsfeil"}
+                </span>
+              )}
               {user.photoURL && <img src={user.photoURL} alt="" style={{ width:28, height:28, borderRadius:"50%", border:"1.5px solid var(--taupe-line)" }} />}
               <button className="btn btn-outline btn-sm" onClick={handleSignOut}>Logg ut</button>
             </div>
