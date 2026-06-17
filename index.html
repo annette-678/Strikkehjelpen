@@ -49,9 +49,15 @@ window._setStoredUser = function(u) {
 </script>
 
 <!-- 5. Babel SIST — etter at alle andre scripts er lastet -->
-<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.23.10/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.22.5/babel.min.js"></script>
+<script>
+// Ensure React is available globally for Babel JSX transform
+window.React = React;
+window.ReactDOM = ReactDOM;
+</script>
 
-<script type="text/babel" data-presets="react">
+
+<script type="text/babel" data-presets="react" data-plugins="transform-react-jsx">
 
 const { useState, useEffect, useRef } = React;
 
