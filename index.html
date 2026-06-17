@@ -15,13 +15,18 @@
   </div>
 </div>
 
-<!-- Google Identity Services -->
-<script src="https://accounts.google.com/gsi/client" async defer></script>
+<!-- 1. React (ingen modules) -->
+<script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js"></script>
 
-<!-- Firebase (kun Firestore — ingen Auth) -->
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<!-- 2. Firebase compat (UMD, ingen import-setninger) -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
+<!-- 3. Google Identity Services -->
+<script src="https://accounts.google.com/gsi/client"></script>
+
+<!-- 4. Init Firebase og globale variabler -->
 <script>
 const GOOGLE_CLIENT_ID = "107531873859-bq0l5h496gkren88kljnem3chndgthke.apps.googleusercontent.com";
 
@@ -35,19 +40,16 @@ firebase.initializeApp({
 });
 window._db = firebase.firestore();
 
-// Enkel brukerinfo lagret i localStorage (ikke sensitiv — bare navn, bilde, sub-id)
-window._getStoredUser = () => {
+window._getStoredUser = function() {
   try { return JSON.parse(localStorage.getItem("garnlager_user") || "null"); } catch(e) { return null; }
 };
-window._setStoredUser = (u) => {
-  try { localStorage.setItem("garnlager_user", u ? JSON.stringify(u) : "null"); } catch(e) {}
+window._setStoredUser = function(u) {
+  try { localStorage.setItem("garnlager_user", u ? JSON.stringify(u) : "null"); } catch(e) {} 
 };
 </script>
 
-<!-- React + Babel -->
-<script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@babel/standalone/babel.min.js"></script>
+<!-- 5. Babel SIST — etter at alle andre scripts er lastet -->
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.23.10/babel.min.js"></script>
 
 <script type="text/babel" data-presets="react">
 
