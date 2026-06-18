@@ -1,4 +1,4 @@
-const CACHE_NAME = 'garnlager-v1';
+const CACHE_NAME = 'garnlager-v3';
 const URLS_TO_CACHE = [
   '/Strikkehjelpen/',
   '/Strikkehjelpen/index.html',
